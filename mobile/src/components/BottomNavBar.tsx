@@ -1,173 +1,207 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Home, Compass, Plus, MapPin, User, MessageSquare } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Home, Search } from 'lucide-react-native';
+import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 
-export type TabName = 'home' | 'explore' | 'create' | 'maps' | 'me' | 'chat';
+export type TabName = 'home' | 'reels' | 'chat' | 'explore' | 'me';
 
 interface BottomNavBarProps {
   currentTab: TabName;
   onSelectTab: (tab: TabName) => void;
   unreadChatCount?: number;
+  userAvatarUrl?: string;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   currentTab,
   onSelectTab,
   unreadChatCount = 2,
+  userAvatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+
+  const barBg = isDark ? 'rgba(22, 22, 30, 0.95)' : 'rgba(255, 255, 255, 0.96)';
+  const activePillBg = isDark ? '#2D2D3D' : '#E5E7EB';
+  const iconColor = isDark ? '#FFFFFF' : '#0F172A';
+  const inactiveColor = isDark ? '#94A3B8' : '#64748B';
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.tabBarBorder,
-        },
-      ]}
-    >
-      {/* 1. Home Tab */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => onSelectTab('home')}
-        activeOpacity={0.7}
+    <View style={styles.floatingWrapper} pointerEvents="box-none">
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: barBg,
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+          },
+        ]}
       >
-        <Home
-          size={22}
-          color={currentTab === 'home' ? colors.primary : colors.textMuted}
-          strokeWidth={currentTab === 'home' ? 2.5 : 2}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            { color: currentTab === 'home' ? colors.primary : colors.textMuted },
-          ]}
+        {/* 1. Home Tab */}
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'home' && { backgroundColor: activePillBg }]}
+          onPress={() => onSelectTab('home')}
+          activeOpacity={0.75}
         >
-          Home
-        </Text>
-      </TouchableOpacity>
+          <Home
+            size={22}
+            color={currentTab === 'home' ? iconColor : inactiveColor}
+            strokeWidth={currentTab === 'home' ? 2.5 : 2}
+          />
+        </TouchableOpacity>
 
-      {/* 2. Explore Tab */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => onSelectTab('explore')}
-        activeOpacity={0.7}
-      >
-        <Compass
-          size={22}
-          color={currentTab === 'explore' ? colors.primary : colors.textMuted}
-          strokeWidth={currentTab === 'explore' ? 2.5 : 2}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            { color: currentTab === 'explore' ? colors.primary : colors.textMuted },
-          ]}
+        {/* 2. Reels Tab (Instagram Reels Clapboard) */}
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'reels' && { backgroundColor: activePillBg }]}
+          onPress={() => onSelectTab('reels')}
+          activeOpacity={0.75}
         >
-          Explore
-        </Text>
-      </TouchableOpacity>
+          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+            {/* Clapboard frame */}
+            <Rect
+              x="2"
+              y="3"
+              width="20"
+              height="18"
+              rx="4"
+              stroke={currentTab === 'reels' ? iconColor : inactiveColor}
+              strokeWidth="2"
+            />
+            {/* Diagonal cuts */}
+            <Path
+              d="M2 8.5H22M6.5 3L4.5 8.5M12.5 3L10.5 8.5M18.5 3L16.5 8.5"
+              stroke={currentTab === 'reels' ? iconColor : inactiveColor}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            {/* Play triangle */}
+            <Polygon
+              points="10,12 15,15 10,18"
+              fill={currentTab === 'reels' ? iconColor : inactiveColor}
+            />
+          </Svg>
+        </TouchableOpacity>
 
-      {/* 3. Create Button (+) */}
-      <TouchableOpacity
-        style={styles.createButtonWrapper}
-        onPress={() => onSelectTab('create')}
-        activeOpacity={0.85}
-      >
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.createButtonGradient}
+        {/* 3. Direct Messages Tab (Paper Airplane with red dot) */}
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'chat' && { backgroundColor: activePillBg }]}
+          onPress={() => onSelectTab('chat')}
+          activeOpacity={0.75}
         >
-          <Plus size={24} color="#FFFFFF" strokeWidth={3} />
-        </LinearGradient>
-      </TouchableOpacity>
+          <View style={styles.iconWithBadge}>
+            <Svg width={23} height={23} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+                stroke={currentTab === 'chat' ? iconColor : inactiveColor}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill={currentTab === 'chat' ? iconColor : 'none'}
+              />
+            </Svg>
+            {unreadChatCount > 0 && <View style={styles.redBadgeDot} />}
+          </View>
+        </TouchableOpacity>
 
-      {/* 4. Maps (Nearby Users 300m) */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => onSelectTab('maps')}
-        activeOpacity={0.7}
-      >
-        <MapPin
-          size={22}
-          color={currentTab === 'maps' ? colors.primary : colors.textMuted}
-          strokeWidth={currentTab === 'maps' ? 2.5 : 2}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            { color: currentTab === 'maps' ? colors.primary : colors.textMuted },
-          ]}
+        {/* 4. Explore / Search Tab */}
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'explore' && { backgroundColor: activePillBg }]}
+          onPress={() => onSelectTab('explore')}
+          activeOpacity={0.75}
         >
-          Maps
-        </Text>
-      </TouchableOpacity>
+          <Search
+            size={22}
+            color={currentTab === 'explore' ? iconColor : inactiveColor}
+            strokeWidth={currentTab === 'explore' ? 2.5 : 2}
+          />
+        </TouchableOpacity>
 
-      {/* 5. Me / Profile */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => onSelectTab('me')}
-        activeOpacity={0.7}
-      >
-        <User
-          size={22}
-          color={currentTab === 'me' ? colors.primary : colors.textMuted}
-          strokeWidth={currentTab === 'me' ? 2.5 : 2}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            { color: currentTab === 'me' ? colors.primary : colors.textMuted },
-          ]}
+        {/* 5. Profile Tab (User Avatar with ring) */}
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'me' && { backgroundColor: activePillBg }]}
+          onPress={() => onSelectTab('me')}
+          activeOpacity={0.75}
         >
-          Me
-        </Text>
-      </TouchableOpacity>
+          <View
+            style={[
+              styles.avatarRing,
+              currentTab === 'me' && {
+                borderColor: iconColor,
+                borderWidth: 2,
+              },
+            ]}
+          >
+            <Image
+              source={{ uri: userAvatarUrl }}
+              style={styles.avatarImage}
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  floatingWrapper: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
   container: {
-    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
+    justifyContent: 'space-between',
+    width: '90%',
+    maxWidth: 360,
+    height: 52,
+    borderRadius: 28,
     paddingHorizontal: 8,
-    zIndex: 100,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 12,
   },
-  tabItem: {
+  tabButton: {
     flex: 1,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    marginHorizontal: 3,
   },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 3,
-  },
-  createButtonWrapper: {
+  iconWithBadge: {
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 4,
   },
-  createButtonGradient: {
-    width: 44,
-    height: 32,
-    borderRadius: 14,
+  redBadgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  avatarRing: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E0287D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 13,
   },
 });

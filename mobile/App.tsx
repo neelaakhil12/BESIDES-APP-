@@ -4,7 +4,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { MobileFrame } from './src/components/MobileFrame';
-import { Header } from './src/components/Header';
 import { BottomNavBar, TabName } from './src/components/BottomNavBar';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
@@ -13,12 +12,13 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
-import { HomeScreen } from './src/screens/HomeScreen';
+import { FeedHomeScreen } from './src/screens/FeedHomeScreen';
+import { ReelsScreen } from './src/screens/ReelsScreen';
+import { ChatScreen } from './src/screens/ChatScreen';
+import { ChatDetailScreen } from './src/screens/ChatDetailScreen';
 import { ExploreScreen } from './src/screens/ExploreScreen';
 import { MapsScreen } from './src/screens/MapsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { ChatScreen } from './src/screens/ChatScreen';
-import { ChatDetailScreen } from './src/screens/ChatDetailScreen';
 import { CreateVideoScreen } from './src/screens/CreateVideoScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 
@@ -28,10 +28,11 @@ type AppScreen =
   | 'register'
   | 'forgot_password'
   | 'main'
-  | 'chat'
   | 'chat_detail'
   | 'settings'
-  | 'view_profile';
+  | 'view_profile'
+  | 'create_video'
+  | 'maps';
 
 const MainNavigator: React.FC = () => {
   const { user, logout } = useAuth();
@@ -88,7 +89,46 @@ const MainNavigator: React.FC = () => {
     );
   }
 
-  // 5. Full-page Modal / Dedicated Screens
+  // 5. Create Video / Post Screen
+  if (currentScreen === 'create_video') {
+    return (
+      <MobileFrame>
+        <CreateVideoScreen
+          onClose={() => setCurrentScreen('main')}
+          onPublishSuccess={() => setCurrentScreen('main')}
+        />
+      </MobileFrame>
+    );
+  }
+
+  // 6. 1-on-1 Chat Detail Screen (Friend Chat conversation)
+  if (currentScreen === 'chat_detail' && selectedConversation) {
+    return (
+      <MobileFrame>
+        <ChatDetailScreen
+          conversation={selectedConversation}
+          onBack={() => setCurrentScreen('main')}
+        />
+      </MobileFrame>
+    );
+  }
+
+  // 7. Maps Screen (300m Nearby Discovery)
+  if (currentScreen === 'maps') {
+    return (
+      <MobileFrame>
+        <MapsScreen
+          onBack={() => setCurrentScreen('main')}
+          onOpenProfile={(id) => {
+            setSelectedProfileId(id);
+            setCurrentScreen('view_profile');
+          }}
+        />
+      </MobileFrame>
+    );
+  }
+
+  // 8. Settings Screen
   if (currentScreen === 'settings') {
     return (
       <MobileFrame>
@@ -103,31 +143,7 @@ const MainNavigator: React.FC = () => {
     );
   }
 
-  if (currentScreen === 'chat') {
-    return (
-      <MobileFrame>
-        <ChatScreen
-          onBack={() => setCurrentScreen('main')}
-          onOpenConversation={(conv) => {
-            setSelectedConversation(conv);
-            setCurrentScreen('chat_detail');
-          }}
-        />
-      </MobileFrame>
-    );
-  }
-
-  if (currentScreen === 'chat_detail' && selectedConversation) {
-    return (
-      <MobileFrame>
-        <ChatDetailScreen
-          conversation={selectedConversation}
-          onBack={() => setCurrentScreen('chat')}
-        />
-      </MobileFrame>
-    );
-  }
-
+  // 9. View Other Profile Screen
   if (currentScreen === 'view_profile' && selectedProfileId) {
     return (
       <MobileFrame>
@@ -139,46 +155,18 @@ const MainNavigator: React.FC = () => {
     );
   }
 
-  // Create Video Full Screen
-  if (activeTab === 'create') {
-    return (
-      <MobileFrame>
-        <CreateVideoScreen
-          onClose={() => setActiveTab('home')}
-          onPublishSuccess={() => setActiveTab('home')}
-        />
-      </MobileFrame>
-    );
-  }
-
-  // Main 5-Tab Application Container (Home, Explore, Create, Maps, Me)
+  // 10. Main 5-Tab Application Container (Home, Reels, Chat, Explore, Profile)
   return (
     <MobileFrame>
       <View style={styles.appContainer}>
-        {/* Top Header - Not shown on full-screen video feed home page to match TikTok/Instagram immersive look */}
-        {activeTab !== 'home' && (
-          <Header
-            title={
-              activeTab === 'explore'
-                ? 'Explore'
-                : activeTab === 'maps'
-                ? 'Nearby Users'
-                : activeTab === 'me'
-                ? 'Profile'
-                : 'Besides'
-            }
-            onOpenChat={() => setCurrentScreen('chat')}
-            onOpenSettings={() => setCurrentScreen('settings')}
-            showChatIcon={activeTab !== 'me'}
-            showSettingsIcon={activeTab === 'me'}
-          />
-        )}
-
         {/* Tab Screen Content */}
         <View style={styles.contentArea}>
+          {/* Tab 1: Instagram-Style Home Feed (Stories + Welcome + Suggested for You + Posts) */}
           {activeTab === 'home' && (
-            <HomeScreen
-              onOpenChat={() => setCurrentScreen('chat')}
+            <FeedHomeScreen
+              onOpenCreate={() => setCurrentScreen('create_video')}
+              onOpenNotifications={() => setActiveTab('chat')}
+              onOpenChat={() => setActiveTab('chat')}
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
@@ -186,6 +174,29 @@ const MainNavigator: React.FC = () => {
             />
           )}
 
+          {/* Tab 2: Dedicated Reels Tab (Full-screen vertical video reels) */}
+          {activeTab === 'reels' && (
+            <ReelsScreen
+              onOpenChat={() => setActiveTab('chat')}
+              onOpenProfile={(id) => {
+                setSelectedProfileId(id);
+                setCurrentScreen('view_profile');
+              }}
+            />
+          )}
+
+          {/* Tab 3: Instagram Direct Messages / Friend Chat */}
+          {activeTab === 'chat' && (
+            <ChatScreen
+              onOpenConversation={(conv) => {
+                setSelectedConversation(conv);
+                setCurrentScreen('chat_detail');
+              }}
+              onOpenMap={() => setCurrentScreen('maps')}
+            />
+          )}
+
+          {/* Tab 4: Explore / Search */}
           {activeTab === 'explore' && (
             <ExploreScreen
               onOpenProfile={(id) => {
@@ -195,15 +206,7 @@ const MainNavigator: React.FC = () => {
             />
           )}
 
-          {activeTab === 'maps' && (
-            <MapsScreen
-              onOpenProfile={(id) => {
-                setSelectedProfileId(id);
-                setCurrentScreen('view_profile');
-              }}
-            />
-          )}
-
+          {/* Tab 5: User Profile */}
           {activeTab === 'me' && (
             <ProfileScreen
               userId={user?.id}
@@ -212,12 +215,13 @@ const MainNavigator: React.FC = () => {
           )}
         </View>
 
-        {/* Bottom 5-Tab Navigation Bar */}
+        {/* Floating Instagram-Style Rounded Pill Navigation Bar */}
         <BottomNavBar
           currentTab={activeTab}
           onSelectTab={(tab) => {
             setActiveTab(tab);
           }}
+          userAvatarUrl={user?.profile?.avatarUrl}
         />
       </View>
     </MobileFrame>
