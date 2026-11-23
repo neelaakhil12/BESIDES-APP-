@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Besides",
+    "slug": "besides",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0814"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Besides needs access to your camera to record videos and stories.",
+        "NSMicrophoneUsageDescription": "Besides needs access to your microphone to record voice bios and video sound.",
+        "NSPhotoLibraryUsageDescription": "Besides needs access to your photos to upload videos and profile pictures.",
+        "NSLocationWhenInUseUsageDescription": "Besides needs access to your location to discover nearby users within 300 meters."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0814"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    }
+  }
+}

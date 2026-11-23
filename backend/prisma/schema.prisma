@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(uuid())
+  fullName        String
+  username        String           @unique
+  email           String           @unique
+  passwordHash    String
+  isVerified      Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  profile         UserProfile?
+  voiceBio        VoiceBio?
+  videos          Video[]
+  likes           VideoLike[]
+  comments        Comment[]
+  videoReplies    VideoReply[]
+  views           VideoView[]
+  
+  followers       Follow[]         @relation("FollowingUsers")
+  following       Follow[]         @relation("FollowerUsers")
+  
+  conversations   ConversationMember[]
+  messages        Message[]
+  searchHistories SearchHistory[]
+  userLocation    UserLocation?
+}
+
+model UserProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  bio                String?
+  avatarUrl          String?
+  locationVisibility Boolean  @default(false)
+  themePreference    String   @default("dark")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VoiceBio {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  audioUrl  String
+  duration  Float    // in seconds, <= 30
+  waveform  String?  // JSON serialized waveform amplitudes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Video {
+  id           String        @id @default(uuid())
+  userId       String
+  videoUrl     String
+  thumbnailUrl String?
+  caption      String?
+  duration     Float?
+  viewCount    Int           @default(0)
+  likeCount    Int           @default(0)
+  commentCount Int           @default(0)
+  shareCount   Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes        VideoLike[]
+  comments     Comment[]
+  views        VideoView[]
+  hashtags     VideoHashtag[]
+}
+
+model VideoLike {
+  id        String   @id @default(uuid())
+  userId    String
+  videoId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+}
+
+model Comment {
+  id              String       @id @default(uuid())
+  userId          String
+  videoId         String
+  parentCommentId String?
+  content         String
+  likeCount       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video           Video        @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  parentComment   Comment?     @relation("NestedReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[]    @relation("NestedReplies")
+  videoReplies    VideoReply[]
+}
+
+model VideoReply {
+  id           String   @id @default(uuid())
+  userId       String
+  commentId    String
+  videoUrl     String
+  thumbnailUrl String?
+  duration     Float    // Max 10.0 seconds
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment      Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User     @relation("FollowerUsers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowingUsers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+model Hashtag {
+  id         String         @id @default(uuid())
+  name       String         @unique
+  videoCount Int            @default(0)
+  createdAt  DateTime       @default(now())
+
+  videos     VideoHashtag[]
+}
+
+model VideoHashtag {
+  id        String   @id @default(uuid())
+  videoId   String
+  hashtagId String
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  hashtag   Hashtag  @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, hashtagId])
+}
+
+model VideoView {
+  id            String   @id @default(uuid())
+  userId        String?
+  videoId       String
+  watchDuration Float    // In seconds
+  createdAt     DateTime @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  video         Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+}
+
+model UserLocation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  latitude  Float
+  longitude Float
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id           String               @id @default(uuid())
+  isGroup      Boolean              @default(false)
+  name         String?
+  avatarUrl    String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  members      ConversationMember[]
+  messages     Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  role           String       @default("member") // "admin" | "member"
+  unreadCount    Int          @default(0)
+  lastReadAt     DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id               String       @id @default(uuid())
+  conversationId   String
+  senderId         String
+  text             String?
+  mediaUrl         String?
+  mediaType        String?      // "image" | "video" | "voice"
+  videoReferenceId String?      // If sharing an in-app video
+  createdAt        DateTime     @default(now())
+
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model MusicTrack {
+  id       String  @id @default(uuid())
+  title    String
+  artist   String
+  audioUrl String
+  duration Float
+  coverUrl String?
+}
+
+model SearchHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  query     String
+  type      String   @default("general") // "user" | "video" | "hashtag" | "general"
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
