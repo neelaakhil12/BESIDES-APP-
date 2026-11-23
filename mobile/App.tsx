@@ -165,8 +165,10 @@ const MainNavigator: React.FC = () => {
           {activeTab === 'home' && (
             <FeedHomeScreen
               onOpenCreate={() => setCurrentScreen('create_video')}
-              onOpenNotifications={() => setActiveTab('chat')}
-              onOpenChat={() => setActiveTab('chat')}
+              onOpenNotifications={() => setCurrentScreen('chat_detail')}
+              onOpenChat={() => setCurrentScreen('chat_detail')}
+              onOpenExplore={() => setActiveTab('explore')}
+              onOpenMap={() => setCurrentScreen('maps')}
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
@@ -219,7 +221,11 @@ const MainNavigator: React.FC = () => {
         <BottomNavBar
           currentTab={activeTab}
           onSelectTab={(tab) => {
-            setActiveTab(tab);
+            if (tab === 'create') {
+              setCurrentScreen('create_video');
+            } else {
+              setActiveTab(tab);
+            }
           }}
           userAvatarUrl={user?.profile?.avatarUrl}
         />

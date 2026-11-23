@@ -1,141 +1,147 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
-import { Home, Compass } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Home, Compass, Plus, Search } from 'lucide-react-native';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 
-export type TabName = 'home' | 'reels' | 'chat' | 'explore' | 'me';
+export type TabName = 'home' | 'explore' | 'create' | 'reels' | 'me' | 'chat';
 
 interface BottomNavBarProps {
   currentTab: TabName;
   onSelectTab: (tab: TabName) => void;
-  unreadChatCount?: number;
   userAvatarUrl?: string;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   currentTab,
   onSelectTab,
-  unreadChatCount = 2,
   userAvatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
 }) => {
-  const { isDark } = useTheme();
-
-  const barBg = isDark ? 'rgba(22, 22, 30, 0.95)' : 'rgba(255, 255, 255, 0.96)';
-  const activePillBg = isDark ? '#2D2D3D' : '#E5E7EB';
-  const iconColor = isDark ? '#FFFFFF' : '#0F172A';
-  const inactiveColor = isDark ? '#94A3B8' : '#64748B';
-
   return (
     <View style={styles.floatingWrapper} pointerEvents="box-none">
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: barBg,
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-          },
-        ]}
-      >
-        {/* 1. Home Tab */}
+      <View style={styles.container}>
+        {/* 1. Home Tab (Glowing Gradient Pill when active) */}
         <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'home' && { backgroundColor: activePillBg }]}
+          style={styles.tabButton}
           onPress={() => onSelectTab('home')}
-          activeOpacity={0.75}
+          activeOpacity={0.8}
         >
-          <Home
-            size={22}
-            color={currentTab === 'home' ? iconColor : inactiveColor}
-            strokeWidth={currentTab === 'home' ? 2.5 : 2}
-          />
+          {currentTab === 'home' ? (
+            <LinearGradient
+              colors={['#2E1065', '#581C87', '#3B0764']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activePillGradient}
+            >
+              <Home size={19} color="#FFFFFF" strokeWidth={2.4} />
+              <Text style={styles.activeTabLabel}>Home</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.inactiveTabContent}>
+              <Home size={19} color="#94A3B8" strokeWidth={2} />
+              <Text style={styles.inactiveTabLabel}>Home</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
-        {/* 2. Reels Tab (Instagram Reels Clapboard) */}
+        {/* 2. Explore Tab (Compass / Search) */}
         <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'reels' && { backgroundColor: activePillBg }]}
-          onPress={() => onSelectTab('reels')}
-          activeOpacity={0.75}
-        >
-          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-            {/* Clapboard frame */}
-            <Rect
-              x="2"
-              y="3"
-              width="20"
-              height="18"
-              rx="4"
-              stroke={currentTab === 'reels' ? iconColor : inactiveColor}
-              strokeWidth="2"
-            />
-            {/* Diagonal cuts */}
-            <Path
-              d="M2 8.5H22M6.5 3L4.5 8.5M12.5 3L10.5 8.5M18.5 3L16.5 8.5"
-              stroke={currentTab === 'reels' ? iconColor : inactiveColor}
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-            {/* Play triangle */}
-            <Polygon
-              points="10,12 15,15 10,18"
-              fill={currentTab === 'reels' ? iconColor : inactiveColor}
-            />
-          </Svg>
-        </TouchableOpacity>
-
-        {/* 3. Direct Messages Tab (Paper Airplane with red dot) */}
-        <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'chat' && { backgroundColor: activePillBg }]}
-          onPress={() => onSelectTab('chat')}
-          activeOpacity={0.75}
-        >
-          <View style={styles.iconWithBadge}>
-            <Svg width={23} height={23} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
-                stroke={currentTab === 'chat' ? iconColor : inactiveColor}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill={currentTab === 'chat' ? iconColor : 'none'}
-              />
-            </Svg>
-            {unreadChatCount > 0 && <View style={styles.redBadgeDot} />}
-          </View>
-        </TouchableOpacity>
-
-        {/* 4. Explore Tab (Compass) */}
-        <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'explore' && { backgroundColor: activePillBg }]}
+          style={styles.tabButton}
           onPress={() => onSelectTab('explore')}
-          activeOpacity={0.75}
+          activeOpacity={0.8}
         >
-          <Compass
-            size={22}
-            color={currentTab === 'explore' ? iconColor : inactiveColor}
-            strokeWidth={currentTab === 'explore' ? 2.5 : 2}
-          />
+          {currentTab === 'explore' ? (
+            <LinearGradient
+              colors={['#2E1065', '#581C87', '#3B0764']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activePillGradient}
+            >
+              <Search size={19} color="#FFFFFF" strokeWidth={2.4} />
+              <Text style={styles.activeTabLabel}>Explore</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.inactiveTabContent}>
+              <Search size={19} color="#94A3B8" strokeWidth={2} />
+              <Text style={styles.inactiveTabLabel}>Explore</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
-        {/* 5. Profile Tab (User Avatar with ring) */}
+        {/* 3. Center Elevated Create (+) Button */}
         <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'me' && { backgroundColor: activePillBg }]}
-          onPress={() => onSelectTab('me')}
-          activeOpacity={0.75}
+          style={styles.createButtonWrapper}
+          onPress={() => onSelectTab('create')}
+          activeOpacity={0.85}
         >
-          <View
-            style={[
-              styles.avatarRing,
-              currentTab === 'me' && {
-                borderColor: iconColor,
-                borderWidth: 2,
-              },
-            ]}
+          <LinearGradient
+            colors={['#6366F1', '#8B5CF6', '#EC4899']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.createGradientCircle}
           >
-            <Image
-              source={{ uri: userAvatarUrl }}
-              style={styles.avatarImage}
-            />
-          </View>
+            <Plus size={24} color="#FFFFFF" strokeWidth={3} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* 4. Reels Tab (Right side nundi 2nd place!) */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => onSelectTab('reels')}
+          activeOpacity={0.8}
+        >
+          {currentTab === 'reels' ? (
+            <LinearGradient
+              colors={['#2E1065', '#581C87', '#3B0764']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activePillGradient}
+            >
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Rect x="2" y="3" width="20" height="18" rx="4" stroke="#FFFFFF" strokeWidth="2" />
+                <Path d="M2 8.5H22M6.5 3L4.5 8.5M12.5 3L10.5 8.5M18.5 3L16.5 8.5" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+                <Polygon points="10,12 15,15 10,18" fill="#FFFFFF" />
+              </Svg>
+              <Text style={styles.activeTabLabel}>Reels</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.inactiveTabContent}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Rect x="2" y="3" width="20" height="18" rx="4" stroke="#94A3B8" strokeWidth="2" />
+                <Path d="M2 8.5H22M6.5 3L4.5 8.5M12.5 3L10.5 8.5M18.5 3L16.5 8.5" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" />
+                <Polygon points="10,12 15,15 10,18" fill="#94A3B8" />
+              </Svg>
+              <Text style={styles.inactiveTabLabel}>Reels</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* 5. Me Tab */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => onSelectTab('me')}
+          activeOpacity={0.8}
+        >
+          {currentTab === 'me' ? (
+            <LinearGradient
+              colors={['#2E1065', '#581C87', '#3B0764']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activePillGradient}
+            >
+              <View style={styles.avatarRingActive}>
+                <Image source={{ uri: userAvatarUrl }} style={styles.avatarImage} />
+              </View>
+              <Text style={styles.activeTabLabel}>Me</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.inactiveTabContent}>
+              <View style={styles.avatarRingInactive}>
+                <Image source={{ uri: userAvatarUrl }} style={styles.avatarImage} />
+              </View>
+              <Text style={styles.inactiveTabLabel}>Me</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -145,7 +151,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 const styles = StyleSheet.create({
   floatingWrapper: {
     position: 'absolute',
-    bottom: 12,
+    bottom: 10,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -155,53 +161,97 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '90%',
-    maxWidth: 360,
-    height: 52,
-    borderRadius: 28,
-    paddingHorizontal: 8,
+    width: '92%',
+    maxWidth: 375,
+    height: 58,
+    borderRadius: 30,
+    paddingHorizontal: 6,
+    backgroundColor: 'rgba(18, 12, 34, 0.95)',
     borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.35)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
     elevation: 12,
   },
   tabButton: {
     flex: 1,
-    height: 40,
-    borderRadius: 20,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 1,
+  },
+  activePillGradient: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '95%',
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(192, 132, 252, 0.5)',
+    shadowColor: '#A855F7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  inactiveTabContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTabLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 1.5,
+  },
+  inactiveTabLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 1.5,
+  },
+  createButtonWrapper: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 3,
   },
-  iconWithBadge: {
-    position: 'relative',
+  createGradientCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#EC4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  redBadgeDot: {
-    position: 'absolute',
-    top: -2,
-    right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  avatarRing: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  avatarRingActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#EC4899',
+  },
+  avatarRingInactive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#94A3B8',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 13,
   },
 });
