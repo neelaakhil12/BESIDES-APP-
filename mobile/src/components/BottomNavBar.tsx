@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Home, Search } from 'lucide-react-native';
+import { Home, Compass } from 'lucide-react-native';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 
 export type TabName = 'home' | 'reels' | 'chat' | 'explore' | 'me';
@@ -103,13 +103,13 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* 4. Explore / Search Tab */}
+        {/* 4. Explore Tab (Compass) */}
         <TouchableOpacity
           style={[styles.tabButton, currentTab === 'explore' && { backgroundColor: activePillBg }]}
           onPress={() => onSelectTab('explore')}
           activeOpacity={0.75}
         >
-          <Search
+          <Compass
             size={22}
             color={currentTab === 'explore' ? iconColor : inactiveColor}
             strokeWidth={currentTab === 'explore' ? 2.5 : 2}
