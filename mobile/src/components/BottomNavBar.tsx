@@ -1,26 +1,28 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Home, Compass, Plus, Search } from 'lucide-react-native';
+import { Home, Search } from 'lucide-react-native';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 
-export type TabName = 'home' | 'explore' | 'create' | 'reels' | 'me' | 'chat';
+export type TabName = 'home' | 'explore' | 'chat' | 'reels' | 'me' | 'create';
 
 interface BottomNavBarProps {
   currentTab: TabName;
   onSelectTab: (tab: TabName) => void;
   userAvatarUrl?: string;
+  unreadCount?: number;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   currentTab,
   onSelectTab,
   userAvatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+  unreadCount = 2,
 }) => {
   return (
     <View style={styles.floatingWrapper} pointerEvents="box-none">
       <View style={styles.container}>
-        {/* 1. Home Tab (Glowing Gradient Pill when active) */}
+        {/* 1. Home Tab */}
         <TouchableOpacity
           style={styles.tabButton}
           onPress={() => onSelectTab('home')}
@@ -44,7 +46,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           )}
         </TouchableOpacity>
 
-        {/* 2. Explore Tab (Compass / Search) */}
+        {/* 2. Explore Tab */}
         <TouchableOpacity
           style={styles.tabButton}
           onPress={() => onSelectTab('explore')}
@@ -68,20 +70,51 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           )}
         </TouchableOpacity>
 
-        {/* 3. Center Elevated Create (+) Button */}
+        {/* 3. Chat / Friend Tab (Center Position - Replaces + button) */}
         <TouchableOpacity
-          style={styles.createButtonWrapper}
-          onPress={() => onSelectTab('create')}
-          activeOpacity={0.85}
+          style={styles.tabButton}
+          onPress={() => onSelectTab('chat')}
+          activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['#6366F1', '#8B5CF6', '#EC4899']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.createGradientCircle}
-          >
-            <Plus size={24} color="#FFFFFF" strokeWidth={3} />
-          </LinearGradient>
+          {currentTab === 'chat' ? (
+            <LinearGradient
+              colors={['#2E1065', '#581C87', '#3B0764']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activePillGradient}
+            >
+              <View style={styles.iconWithBadge}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+                    stroke="#FFFFFF"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="#FFFFFF"
+                  />
+                </Svg>
+                {unreadCount > 0 && <View style={styles.redBadgeDot} />}
+              </View>
+              <Text style={styles.activeTabLabel}>Chat</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.inactiveTabContent}>
+              <View style={styles.iconWithBadge}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+                    stroke="#94A3B8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+                {unreadCount > 0 && <View style={styles.redBadgeDot} />}
+              </View>
+              <Text style={styles.inactiveTabLabel}>Chat</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* 4. Reels Tab (Right side nundi 2nd place!) */}
@@ -213,26 +246,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 1.5,
   },
-  createButtonWrapper: {
-    width: 48,
-    height: 48,
+  iconWithBadge: {
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 3,
   },
-  createGradientCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#EC4899',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+  redBadgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#120C22',
   },
   avatarRingActive: {
     width: 20,

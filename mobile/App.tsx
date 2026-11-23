@@ -165,8 +165,8 @@ const MainNavigator: React.FC = () => {
           {activeTab === 'home' && (
             <FeedHomeScreen
               onOpenCreate={() => setCurrentScreen('create_video')}
-              onOpenNotifications={() => setCurrentScreen('chat_detail')}
-              onOpenChat={() => setCurrentScreen('chat_detail')}
+              onOpenNotifications={() => setActiveTab('chat')}
+              onOpenChat={() => setActiveTab('chat')}
               onOpenExplore={() => setActiveTab('explore')}
               onOpenMap={() => setCurrentScreen('maps')}
               onOpenProfile={(id) => {
