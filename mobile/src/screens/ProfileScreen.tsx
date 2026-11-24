@@ -8,9 +8,23 @@ import {
   ScrollView,
   Dimensions,
   Modal,
-  ActivityIndicator,
+  TextInput,
+  Share,
 } from 'react-native';
-import { CheckCircle2, Settings, Mic, Play, Pause, Square, Film, MessageCircle, Heart } from 'lucide-react-native';
+import {
+  Settings,
+  Camera,
+  Volume2,
+  VolumeX,
+  Share2,
+  Clapperboard,
+  CornerDownRight,
+  Heart,
+  Plus,
+  Play,
+  X,
+  Check,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { useTheme } from '../theme/ThemeContext';
@@ -24,69 +38,72 @@ interface ProfileScreenProps {
   userId?: string;
   onOpenSettings: () => void;
   onSelectVideo?: (video: any) => void;
+  onNavigateCreate?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userId,
   onOpenSettings,
   onSelectVideo,
+  onNavigateCreate,
 }) => {
-  const { colors, isDark } = useTheme();
-  const { user: authUser, refreshUser } = useAuth();
+  const { colors } = useTheme();
+  const { user: authUser, updateUser } = useAuth();
 
-  const targetIdentifier = userId || authUser?.id || 'harshitha';
-  const initialUser = (MOCK_USERS as any)[targetIdentifier] || authUser || MOCK_USERS.harshitha;
+  // Selected profile user data
+  const targetId = userId || authUser?.id || 'akhil';
+  const initialUser =
+    (MOCK_USERS as any)[targetId] ||
+    authUser || {
+      fullName: 'Akhil Harish Neela',
+      username: 'user_11c2796d',
+      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+    };
 
-  const [profileData, setProfileData] = useState<any | null>(initialUser);
-  const [activeTab, setActiveTab] = useState<'moments' | 'replies' | 'liked'>('moments');
-  const [videos, setVideos] = useState<any[]>(MOCK_VIDEOS);
+  const [profileData, setProfileData] = useState<any>({
+    fullName: authUser?.fullName || 'Akhil Harish Neela',
+    username: authUser?.username || 'user_11c2796d',
+    avatarUrl:
+      authUser?.profile?.avatarUrl ||
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+    stats: {
+      moments: 0,
+      audience: 0,
+      interests: 0,
+    },
+  });
+
+  // Tabs: 'moments' | 'video_comments' | 'liked'
+  const [activeTab, setActiveTab] = useState<'moments' | 'video_comments' | 'liked'>('moments');
+
+  // Moments list (starts empty to match screenshot, but can hold items)
+  const [moments, setMoments] = useState<any[]>([]);
+  const [videoComments, setVideoComments] = useState<any[]>([]);
+  const [likedMoments, setLikedMoments] = useState<any[]>([]);
 
   // Voice Bio Audio playback state
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [voiceSound, setVoiceSound] = useState<Audio.Sound | null>(null);
 
-  // Voice Bio recording modal state
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordTimer, setRecordTimer] = useState(0);
+  // Edit Profile Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFullName, setEditFullName] = useState(profileData.fullName);
+  const [editUsername, setEditUsername] = useState(profileData.username);
 
-  const fetchProfile = async () => {
+  // Share profile
+  const handleShareProfile = async () => {
     try {
-      const res = await api.get(`/users/${targetIdentifier}`);
-      if (res.data?.success && res.data.user) {
-        setProfileData(res.data.user);
-      }
-    } catch (err) {
-      // offline fallback
-      setProfileData((MOCK_USERS as any)[targetIdentifier] || authUser || MOCK_USERS.harshitha);
+      await Share.share({
+        message: `Check out @${profileData.username}'s profile on Besides: https://besides.app/@${profileData.username}`,
+      });
+    } catch (error) {
+      console.log('Share error:', error);
     }
   };
 
-  const fetchVideos = async () => {
-    try {
-      const res = await api.get(`/users/${targetIdentifier}/videos`);
-      if (res.data?.success && res.data.videos?.length > 0) {
-        setVideos(res.data.videos);
-      }
-    } catch (err) {
-      setVideos(MOCK_VIDEOS);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfile();
-    fetchVideos();
-
-    return () => {
-      if (voiceSound) {
-        voiceSound.unloadAsync();
-      }
-    };
-  }, [targetIdentifier]);
-
-  // Voice Bio Play / Pause
+  // Toggle Voice Bio audio preview
   const togglePlayVoiceBio = async () => {
-    const audioUrl = profileData?.voiceBio?.audioUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg';
+    const audioUrl = 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg';
 
     try {
       if (voiceSound) {
@@ -111,447 +128,658 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setIsPlayingVoice(true);
       }
     } catch (err) {
-      console.log('Play voice bio error:', err);
+      console.log('Voice bio error:', err);
     }
   };
 
-  // Mock voice recorder saving (Strictly <= 30s)
-  const handleSaveVoiceBio = async () => {
-    setIsRecording(false);
-    setShowVoiceRecorder(false);
-    try {
-      await api.post('/users/voice-bio', {
-        audioUrl: 'https://actions.google.com/sounds/v1/water/waves_crashing.ogg',
-        duration: Math.min(30.0, recordTimer || 7.0),
-      });
-      fetchProfile();
-      refreshUser();
-    } catch (err) {
-      console.log('Save voice bio error:', err);
-    }
-  };
+  useEffect(() => {
+    return () => {
+      if (voiceSound) {
+        voiceSound.unloadAsync();
+      }
+    };
+  }, [voiceSound]);
 
-  const currentProfile = profileData || authUser;
+  const handleSaveProfile = () => {
+    setProfileData((prev: any) => ({
+      ...prev,
+      fullName: editFullName,
+      username: editUsername,
+    }));
+    if (updateUser) {
+      updateUser({ fullName: editFullName, username: editUsername });
+    }
+    setShowEditModal(false);
+  };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      {/* Header bar */}
-      <View style={[styles.header, { borderBottomColor: colors.tabBarBorder }]}>
-        <View style={styles.usernameRow}>
-          <Text style={[styles.headerUsername, { color: colors.text }]}>
-            @{currentProfile?.username || 'harshitha'}
-          </Text>
-          <CheckCircle2 size={16} color={colors.primary} style={{ marginLeft: 6 }} />
+    <View style={[styles.container, { backgroundColor: '#0B0814' }]}>
+      {/* 1. TOP HEADER (Center Username, Right Settings Button) */}
+      <View style={styles.header}>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerUsername}>{profileData.username}</Text>
         </View>
 
-        <TouchableOpacity onPress={onOpenSettings} style={styles.settingsButton}>
-          <Settings size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Avatar & Stats */}
-      <View style={styles.profileHero}>
-        <View style={styles.avatarBorderGlow}>
-          <Image
-            source={{
-              uri:
-                currentProfile?.profile?.avatarUrl ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
-            }}
-            style={styles.avatarImage}
-          />
-        </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {currentProfile?.stats?.videos || 124}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Videos
-            </Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {currentProfile?.stats?.audience || '18.4K'}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Audience
-            </Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {currentProfile?.stats?.interests || 328}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Following
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Name and Bio */}
-      <View style={styles.bioContainer}>
-        <Text style={[styles.fullName, { color: colors.text }]}>
-          {currentProfile?.fullName || 'Harshitha Rao'}
-        </Text>
-        <Text style={[styles.bioText, { color: colors.textSecondary }]}>
-          {currentProfile?.profile?.bio || 'Content Creator | Travel | Lifestyle ✨'}
-        </Text>
-
-        {/* Edit Profile Button */}
-        <TouchableOpacity style={[styles.editProfileButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <Text style={[styles.editProfileText, { color: colors.text }]}>Edit Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Voice Bio Player (Compulsory V1 Feature) */}
-      <View style={styles.voiceBioSection}>
         <TouchableOpacity
-          style={[styles.voiceBioPill, { backgroundColor: colors.surfaceLight, borderColor: colors.primary }]}
-          onPress={togglePlayVoiceBio}
+          style={styles.settingsButton}
+          onPress={onOpenSettings}
           activeOpacity={0.8}
         >
-          <View style={[styles.micCircle, { backgroundColor: colors.primary }]}>
-            <Mic size={14} color="#FFFFFF" />
-          </View>
-
-          <Text style={[styles.voiceBioTitle, { color: colors.text }]}>
-            Voice Bio
-          </Text>
-
-          {/* Audio Waveform visualization */}
-          <View style={styles.waveformContainer}>
-            {[0.4, 0.8, 0.5, 0.9, 0.3, 0.7, 1.0, 0.6, 0.4, 0.8].map((amp, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.waveformBar,
-                  {
-                    height: 18 * amp,
-                    backgroundColor: isPlayingVoice ? colors.primary : colors.textSecondary,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* Play/Pause Button */}
-          <View style={styles.playButton}>
-            {isPlayingVoice ? (
-              <Pause size={14} color={colors.primary} />
-            ) : (
-              <Play size={14} color={colors.primary} fill={colors.primary} />
-            )}
-          </View>
-
-          {/* Duration */}
-          <Text style={[styles.voiceDurationText, { color: colors.textSecondary }]}>
-            0:0{Math.round(currentProfile?.voiceBio?.duration || 7)}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Record / Replace Voice Bio Button */}
-        <TouchableOpacity
-          style={styles.recordNewVoiceButton}
-          onPress={() => setShowVoiceRecorder(true)}
-        >
-          <Text style={[styles.recordNewVoiceText, { color: colors.primary }]}>
-            + Record Voice Bio (≤30s)
-          </Text>
+          <Settings size={18} color="#FFFFFF" strokeWidth={2.2} />
         </TouchableOpacity>
       </View>
 
-      {/* Profile Content Tabs: Moments (Videos), Replies, Liked */}
-      <View style={[styles.tabBar, { borderBottomColor: colors.tabBarBorder }]}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'moments' && styles.activeTab]}
-          onPress={() => setActiveTab('moments')}
-        >
-          <Film size={18} color={activeTab === 'moments' ? colors.primary : colors.textMuted} />
-          <Text style={[styles.tabTitle, { color: activeTab === 'moments' ? colors.primary : colors.textMuted }]}>
-            Moments
-          </Text>
-        </TouchableOpacity>
+      <ScrollView
+        style={styles.scrollArea}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 110 }}
+      >
+        {/* 2. PROFILE HERO (Avatar + Camera Badge on Left, Name + Voice Bio on Right) */}
+        <View style={styles.heroSection}>
+          {/* Avatar with Camera Icon Badge */}
+          <View style={styles.avatarWrapper}>
+            <Image
+              source={{ uri: profileData.avatarUrl }}
+              style={styles.avatarImage}
+            />
+            <TouchableOpacity
+              style={styles.cameraBadge}
+              onPress={() => setShowEditModal(true)}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cameraBadgeGradient}
+              >
+                <Camera size={13} color="#FFFFFF" strokeWidth={2.5} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'replies' && styles.activeTab]}
-          onPress={() => setActiveTab('replies')}
-        >
-          <MessageCircle size={18} color={activeTab === 'replies' ? colors.primary : colors.textMuted} />
-          <Text style={[styles.tabTitle, { color: activeTab === 'replies' ? colors.primary : colors.textMuted }]}>
-            Replies
-          </Text>
-        </TouchableOpacity>
+          {/* Name, Handle, and Voice Bio Pill */}
+          <View style={styles.heroMeta}>
+            <Text style={styles.fullNameText}>{profileData.fullName}</Text>
+            <Text style={styles.handleText}>@{profileData.username}</Text>
 
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'liked' && styles.activeTab]}
-          onPress={() => setActiveTab('liked')}
-        >
-          <Heart size={18} color={activeTab === 'liked' ? colors.primary : colors.textMuted} />
-          <Text style={[styles.tabTitle, { color: activeTab === 'liked' ? colors.primary : colors.textMuted }]}>
-            Liked
-          </Text>
-        </TouchableOpacity>
-      </View>
+            {/* Voice Bio Pill Button */}
+            <TouchableOpacity
+              style={[
+                styles.voiceBioPill,
+                isPlayingVoice && { borderColor: colors.primary },
+              ]}
+              onPress={togglePlayVoiceBio}
+              activeOpacity={0.8}
+            >
+              {isPlayingVoice ? (
+                <VolumeX size={15} color={colors.primary} style={{ marginRight: 6 }} />
+              ) : (
+                <Volume2 size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+              )}
+              <Text style={styles.voiceBioText}>
+                {isPlayingVoice ? 'Playing bio...' : 'Voice bio • generated voice'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      {/* Moments Video Grid */}
-      <View style={styles.gridContainer}>
-        {videos.map((vid) => (
+        {/* 3. STATS CARD (Moments | Audience | Interests) */}
+        <View style={styles.statsCard}>
+          <View style={styles.statCol}>
+            <Text style={styles.statValue}>{profileData.stats.moments}</Text>
+            <Text style={styles.statLabel}>Moments</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statCol}>
+            <Text style={styles.statValue}>{profileData.stats.audience}</Text>
+            <Text style={styles.statLabel}>Audience</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statCol}>
+            <Text style={styles.statValue}>{profileData.stats.interests}</Text>
+            <Text style={styles.statLabel}>Interests</Text>
+          </View>
+        </View>
+
+        {/* 4. ACTION BUTTONS ROW (Edit Profile, Share Profile, Settings Gear) */}
+        <View style={styles.actionsRow}>
+          {/* A. Edit Profile Button (Besides Vibrant Brand Gradient) */}
           <TouchableOpacity
-            key={vid.id}
-            style={styles.gridItem}
-            onPress={() => onSelectVideo && onSelectVideo(vid)}
+            style={styles.editProfileButtonWrapper}
+            onPress={() => setShowEditModal(true)}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.editProfileGradient}
+            >
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* B. Share Profile Button */}
+          <TouchableOpacity
+            style={styles.shareProfileButton}
+            onPress={handleShareProfile}
             activeOpacity={0.8}
           >
-            <Image
-              source={{
-                uri:
-                  vid.thumbnailUrl ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-              }}
-              style={styles.gridThumbnail}
-            />
-            <View style={styles.gridOverlay}>
-              <Heart size={12} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.gridLikeCount}>{vid.likeCount || 124}</Text>
-            </View>
+            <Share2 size={15} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
+            <Text style={styles.shareProfileText}>Share Profile</Text>
           </TouchableOpacity>
-        ))}
-      </View>
 
-      {/* Voice Recorder Modal */}
-      <Modal visible={showVoiceRecorder} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.recorderCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.recorderTitle, { color: colors.text }]}>
-              Record Voice Bio
-            </Text>
-            <Text style={[styles.recorderSubtitle, { color: colors.textSecondary }]}>
-              Maximum duration: 30 seconds
-            </Text>
+          {/* C. Secondary Settings Icon Button */}
+          <TouchableOpacity
+            style={styles.gearIconButton}
+            onPress={onOpenSettings}
+            activeOpacity={0.8}
+          >
+            <Settings size={17} color="#FFFFFF" strokeWidth={2.2} />
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.recorderTimerContainer}>
-              <Text style={[styles.timerText, { color: colors.primary }]}>
-                0:{recordTimer < 10 ? `0${recordTimer}` : recordTimer} / 0:30
+        {/* 5. TABS BAR (Moments, Video Comments, Liked) */}
+        <View style={styles.tabsBar}>
+          {/* Tab 1: Moments */}
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setActiveTab('moments')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tabLabelRow}>
+              <Clapperboard
+                size={17}
+                color={activeTab === 'moments' ? colors.primary : '#94A3B8'}
+                strokeWidth={activeTab === 'moments' ? 2.6 : 2}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.tabLabelText,
+                  activeTab === 'moments' && { color: colors.primary, fontWeight: '800' },
+                ]}
+              >
+                Moments
               </Text>
+            </View>
+            {activeTab === 'moments' && (
+              <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+
+          {/* Tab 2: Video Comments */}
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setActiveTab('video_comments')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tabLabelRow}>
+              <CornerDownRight
+                size={17}
+                color={activeTab === 'video_comments' ? colors.primary : '#94A3B8'}
+                strokeWidth={activeTab === 'video_comments' ? 2.6 : 2}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.tabLabelText,
+                  activeTab === 'video_comments' && { color: colors.primary, fontWeight: '800' },
+                ]}
+              >
+                Video Comments
+              </Text>
+            </View>
+            {activeTab === 'video_comments' && (
+              <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+
+          {/* Tab 3: Liked */}
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setActiveTab('liked')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tabLabelRow}>
+              <Heart
+                size={17}
+                color={activeTab === 'liked' ? colors.primary : '#94A3B8'}
+                strokeWidth={activeTab === 'liked' ? 2.6 : 2}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.tabLabelText,
+                  activeTab === 'liked' && { color: colors.primary, fontWeight: '800' },
+                ]}
+              >
+                Liked
+              </Text>
+            </View>
+            {activeTab === 'liked' && (
+              <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* 6. TAB CONTENT (Moments / Video Comments / Liked) */}
+        <View style={styles.tabContentArea}>
+          {/* TAB 1: MOMENTS EMPTY STATE (Matching Screenshot 1) */}
+          {activeTab === 'moments' && moments.length === 0 && (
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyIconBadge}>
+                <Clapperboard size={28} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <Text style={styles.emptyTitle}>No Moments yet.</Text>
+              <Text style={styles.emptySubtitle}>
+                Tap + to record your first moment.
+              </Text>
+            </View>
+          )}
+
+          {/* TAB 1: MOMENTS GRID (When moments exist) */}
+          {activeTab === 'moments' && moments.length > 0 && (
+            <View style={styles.videoGrid}>
+              {moments.map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.gridCard}
+                  onPress={() => onSelectVideo && onSelectVideo(item)}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: item.thumbnailUrl }} style={styles.gridThumb} />
+                  <View style={styles.gridOverlay}>
+                    <Play size={10} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 4 }} />
+                    <Text style={styles.gridViews}>{item.views || '1.2K'}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* TAB 2: VIDEO COMMENTS EMPTY STATE (Matching Screenshot 2) */}
+          {activeTab === 'video_comments' && (
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyIconBadge}>
+                <CornerDownRight size={28} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <Text style={styles.emptyTitle}>No Video Comments yet.</Text>
+              <Text style={styles.emptySubtitle}>
+                Reply to a moment with a video and it'll live here.
+              </Text>
+            </View>
+          )}
+
+          {/* TAB 3: LIKED EMPTY STATE (Matching Screenshot 3) */}
+          {activeTab === 'liked' && (
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyIconBadge}>
+                <Heart size={28} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <Text style={styles.emptyTitle}>No liked content yet.</Text>
+              <Text style={styles.emptySubtitle}>
+                Moments and video comments you like will appear here.
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* 7. EDIT PROFILE MODAL */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <X size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editFullName}
+                onChangeText={setEditFullName}
+                placeholder="Your full name"
+                placeholderTextColor="#64748B"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editUsername}
+                onChangeText={setEditUsername}
+                placeholder="username"
+                placeholderTextColor="#64748B"
+              />
             </View>
 
             <TouchableOpacity
-              style={[styles.micBigButton, { backgroundColor: isRecording ? colors.danger : colors.primary }]}
-              onPress={() => {
-                if (!isRecording) {
-                  setIsRecording(true);
-                  setRecordTimer(7); // Simulate 7s recording
-                } else {
-                  handleSaveVoiceBio();
-                }
-              }}
+              style={styles.saveModalButton}
+              onPress={handleSaveProfile}
+              activeOpacity={0.85}
             >
-              {isRecording ? (
-                <Square size={28} color="#FFFFFF" fill="#FFFFFF" />
-              ) : (
-                <Mic size={32} color="#FFFFFF" />
-              )}
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.saveModalGradient}
+              >
+                <Check size={18} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                <Text style={styles.saveModalText}>Save Changes</Text>
+              </LinearGradient>
             </TouchableOpacity>
-
-            <View style={styles.recorderActionsRow}>
-              <TouchableOpacity
-                onPress={() => setShowVoiceRecorder(false)}
-                style={styles.cancelButton}
-              >
-                <Text style={{ color: colors.textSecondary }}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleSaveVoiceBio}
-                style={[styles.saveVoiceButton, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.saveVoiceText}>Save Bio</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0B0814',
   },
+  // 1. TOP HEADER
   header: {
-    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    paddingTop: 14,
+    paddingBottom: 8,
+    position: 'relative',
   },
-  usernameRow: {
-    flexDirection: 'row',
+  headerCenter: {
     alignItems: 'center',
   },
   headerUsername: {
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '800',
+    letterSpacing: -0.2,
   },
   settingsButton: {
-    padding: 6,
-  },
-  profileHero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  avatarBorderGlow: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    padding: 3,
-    backgroundColor: '#E0287D',
-    shadowColor: '#E0287D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 38,
-  },
-  statsRow: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginLeft: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  bioContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  fullName: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  bioText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  editProfileButton: {
-    height: 34,
-    borderRadius: 8,
+    position: 'absolute',
+    right: 16,
+    top: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editProfileText: {
-    fontSize: 13,
-    fontWeight: '600',
+
+  scrollArea: {
+    flex: 1,
   },
-  voiceBioSection: {
+
+  // 2. HERO SECTION
+  heroSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  avatarImage: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#161129',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#0B0814',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadgeGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroMeta: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  fullNameText: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    marginBottom: 2,
+  },
+  handleText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   voiceBioPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 24,
-    borderWidth: 1.5,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
   },
-  micCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  voiceBioTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginRight: 10,
-  },
-  waveformContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 20,
-    marginRight: 10,
-  },
-  waveformBar: {
-    width: 3,
-    borderRadius: 1.5,
-  },
-  playButton: {
-    marginRight: 8,
-  },
-  voiceDurationText: {
+  voiceBioText: {
+    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
   },
-  recordNewVoiceButton: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
-  recordNewVoiceText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  tabBar: {
+
+  // 3. STATS CARD
+  statsCard: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
   },
-  tabItem: {
+  statCol: {
+    alignItems: 'center',
     flex: 1,
+  },
+  statValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  statLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+
+  // 4. ACTION BUTTONS ROW
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 20,
+  },
+  editProfileButtonWrapper: {
+    flex: 1.4,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  editProfileGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editProfileText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.1,
+  },
+  shareProfileButton: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 22,
+    paddingVertical: 12,
   },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#E0287D',
-  },
-  tabTitle: {
-    fontSize: 12,
+  shareProfileText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
-    marginLeft: 6,
   },
-  gridContainer: {
+  gearIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // 5. TABS BAR
+  tabsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    position: 'relative',
+  },
+  tabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tabLabelText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: '20%',
+    right: '20%',
+    height: 2.5,
+    borderRadius: 1.5,
+  },
+
+  // 6. TAB CONTENT AREA
+  tabContentArea: {
+    paddingTop: 48,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyIconBadge: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: 'rgba(224, 40, 125, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(224, 40, 125, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    color: '#94A3B8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 240,
+  },
+
+  // Video Grid for Moments
+  videoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    width: '100%',
   },
-  gridItem: {
+  gridCard: {
     width: '33.33%',
-    height: 130,
+    height: 140,
     padding: 1,
     position: 'relative',
   },
-  gridThumbnail: {
+  gridThumb: {
     width: '100%',
     height: '100%',
   },
@@ -561,73 +789,78 @@ const styles = StyleSheet.create({
     left: 6,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  gridLikeCount: {
+  gridViews: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
-  modalOverlay: {
+
+  // 7. MODAL
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
-    padding: 24,
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  recorderCard: {
+  modalCard: {
     width: '100%',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
+    maxWidth: 340,
+    backgroundColor: '#161129',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 20,
   },
-  recorderTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  recorderSubtitle: {
-    fontSize: 12,
-    marginBottom: 16,
-  },
-  recorderTimerContainer: {
-    marginBottom: 20,
-  },
-  timerText: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  micBigButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  recorderActionsRow: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  cancelButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  saveVoiceButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  saveVoiceText: {
+  modalTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  inputLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  saveModalButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  saveModalGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  saveModalText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
