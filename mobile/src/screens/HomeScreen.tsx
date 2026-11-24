@@ -1076,14 +1076,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
 
-  // RIGHT ACTIONS COLUMN
+  // RIGHT ACTIONS COLUMN (Shifted higher so it sits cleanly above the small preview card)
   rightActionsColumn: {
     position: 'absolute',
     right: 14,
-    bottom: 90,
+    bottom: 175,
     alignItems: 'center',
     zIndex: 20,
-    gap: 16,
+    gap: 14,
   },
   actionItem: {
     alignItems: 'center',
