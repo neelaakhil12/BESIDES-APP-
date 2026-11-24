@@ -416,37 +416,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         )}
 
-        {/* 5. Stacked Video Preview Deck Card (Visible in both full-screen & deck mode; clicking toggles Deck Mode!) */}
-        <TouchableOpacity
-          style={[styles.nextPreviewDeck, isDeckMode && styles.nextPreviewDeckInMode]}
-          onPress={() => setIsDeckMode((prev) => !prev)}
-          activeOpacity={0.85}
-        >
-          {/* Stack 3D Layer Underlay */}
-          <View style={styles.deckCardUnderlay} />
-          {/* Main Preview Card */}
-          <View style={styles.deckCardMain}>
-            <Image
-              source={{ uri: nextReel?.thumbnailUrl || item.thumbnailUrl }}
-              style={styles.deckThumbnail}
-            />
-            {/* Badge: 📹 index/15 */}
-            <View style={styles.deckBadge}>
-              <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
-              <Text style={styles.deckBadgeText}>
-                {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
-              </Text>
-            </View>
-            {/* Mini Creator Avatar Badge */}
-            <View style={styles.deckAvatarBadge}>
-              <Image
-                source={{ uri: nextReel?.user?.avatarUrl || item.user.avatarUrl }}
-                style={styles.deckAvatarImg}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-
         {/* Bottom Left: Creator Info, Caption, Music Row */}
         <View style={[styles.bottomCreatorContainer, isDeckMode && { opacity: 0.75 }]}>
           <View style={styles.creatorRow}>
@@ -959,7 +928,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* 4. COMMENTS MODAL */}
+      {/* 4. FLOATING MINI PREVIEW CARD (Always on top with zIndex: 300, clicking toggles & closes Deck Mode!) */}
+      <TouchableOpacity
+        style={styles.floatingMiniPreviewDeck}
+        onPress={() => setIsDeckMode((prev) => !prev)}
+        activeOpacity={0.85}
+      >
+        {/* Stack 3D Layer Underlay */}
+        <View style={styles.deckCardUnderlay} />
+        {/* Main Preview Card */}
+        <View style={styles.deckCardMain}>
+          <Image
+            source={{ uri: nextReel?.thumbnailUrl || videos[currentIndex]?.thumbnailUrl }}
+            style={styles.deckThumbnail}
+          />
+          {/* Badge: 📹 index/15 */}
+          <View style={styles.deckBadge}>
+            <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
+            <Text style={styles.deckBadgeText}>
+              {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
+            </Text>
+          </View>
+          {/* Mini Creator Avatar Badge */}
+          <View style={styles.deckAvatarBadge}>
+            <Image
+              source={{ uri: nextReel?.user?.avatarUrl || videos[currentIndex]?.user?.avatarUrl }}
+              style={styles.deckAvatarImg}
+            />
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {/* 5. COMMENTS MODAL */}
       {selectedVideoForComments && (
         <CommentsModal
           visible={true}
@@ -1112,16 +1112,13 @@ const styles = StyleSheet.create({
   },
 
   // 3D STACKED PREVIEW DECK BUTTON
-  nextPreviewDeck: {
+  floatingMiniPreviewDeck: {
     position: 'absolute',
     bottom: 84,
     right: 14,
     width: 58,
     height: 74,
-    zIndex: 100,
-  },
-  nextPreviewDeckInMode: {
-    zIndex: 200,
+    zIndex: 300,
   },
   deckCardUnderlay: {
     position: 'absolute',
