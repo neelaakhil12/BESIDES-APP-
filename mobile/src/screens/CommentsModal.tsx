@@ -17,12 +17,14 @@ import api from '../services/api';
 import { MOCK_COMMENTS, MOCK_USERS } from '../services/mockData';
 
 interface CommentsModalProps {
+  visible?: boolean;
   video: any;
   onClose: () => void;
   onCommentAdded?: () => void;
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({
+  visible = true,
   video,
   onClose,
   onCommentAdded,
@@ -148,7 +150,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
 
   return (
     <Modal
-      visible={true}
+      visible={visible}
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}

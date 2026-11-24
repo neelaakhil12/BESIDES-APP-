@@ -78,17 +78,23 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
   const handleEnableLocation = () => {
     setIsLocationEnabled(true);
+    setIsDiscoverable(true);
     setSegmentTab('map');
   };
 
-  const filteredPeople = MOCK_EXPLORE_PEOPLE.filter((p) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      p.fullName.toLowerCase().includes(q) ||
-      p.username.toLowerCase().includes(q)
-    );
-  });
+  // Only reveal nearby people if location discovery is enabled and discoverable!
+  const isLocationActive = isLocationEnabled && isDiscoverable;
+
+  const filteredPeople = isLocationActive
+    ? MOCK_EXPLORE_PEOPLE.filter((p) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          p.fullName.toLowerCase().includes(q) ||
+          p.username.toLowerCase().includes(q)
+        );
+      })
+    : [];
 
   return (
     <View style={[styles.container, { backgroundColor: '#0B0814' }]}>
@@ -419,59 +425,86 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 <View style={styles.mapParkArea} />
               </View>
 
-              {/* Clustered User Pins (Matching Screenshot Clustered Formation) */}
-              <View style={styles.pinsClusterContainer}>
-                {filteredPeople.map((person, idx) => {
-                  const isSelected = selectedUser?.id === person.id;
-                  // Offsets to cluster them tightly around center as in screenshot
-                  const clusterOffsets = [
-                    { left: 100, top: 120, zIndex: 10 }, // Younus Khan
-                    { left: 145, top: 140, zIndex: 12 }, // Lena Vale
-                    { left: 170, top: 90, zIndex: 8 },   // Theo Park
-                    { left: 185, top: 130, zIndex: 9 },  // Sol Haddad
-                    { left: 155, top: 110, zIndex: 11 }, // Maya Ortiz
-                  ];
-                  const pos = clusterOffsets[idx % clusterOffsets.length];
+              {/* Clustered User Pins (Only rendered when Location Discovery is active!) */}
+              {isLocationActive ? (
+                <View style={styles.pinsClusterContainer}>
+                  {filteredPeople.map((person, idx) => {
+                    const isSelected = selectedUser?.id === person.id;
+                    const clusterOffsets = [
+                      { left: 100, top: 120, zIndex: 10 },
+                      { left: 145, top: 140, zIndex: 12 },
+                      { left: 170, top: 90, zIndex: 8 },
+                      { left: 185, top: 130, zIndex: 9 },
+                      { left: 155, top: 110, zIndex: 11 },
+                    ];
+                    const pos = clusterOffsets[idx % clusterOffsets.length];
 
-                  return (
-                    <TouchableOpacity
-                      key={person.id}
-                      style={[
-                        styles.mapPinItem,
-                        {
-                          left: pos.left,
-                          top: pos.top,
-                          zIndex: isSelected ? 20 : pos.zIndex,
-                        },
-                      ]}
-                      onPress={() => setSelectedUser(person)}
-                      activeOpacity={0.85}
-                    >
-                      <View
+                    return (
+                      <TouchableOpacity
+                        key={person.id}
                         style={[
-                          styles.pinAvatarRing,
+                          styles.mapPinItem,
                           {
-                            borderColor: isSelected ? colors.primary : '#E0287D',
-                            shadowColor: colors.primary,
+                            left: pos.left,
+                            top: pos.top,
+                            zIndex: isSelected ? 20 : pos.zIndex,
                           },
                         ]}
+                        onPress={() => setSelectedUser(person)}
+                        activeOpacity={0.85}
                       >
-                        {person.isInitialAvatar ? (
-                          <View style={styles.pinInitialCircle}>
-                            <Text style={styles.pinInitialLetter}>{person.initial}</Text>
-                          </View>
-                        ) : (
-                          <Image source={{ uri: person.avatarUrl }} style={styles.pinPhoto} />
-                        )}
-                      </View>
-                      {/* DEMO Tag under pin */}
-                      <View style={styles.pinDemoBadge}>
-                        <Text style={styles.pinDemoText}>DEMO</Text>
-                      </View>
+                        <View
+                          style={[
+                            styles.pinAvatarRing,
+                            {
+                              borderColor: isSelected ? colors.primary : '#E0287D',
+                              shadowColor: colors.primary,
+                            },
+                          ]}
+                        >
+                          {person.isInitialAvatar ? (
+                            <View style={styles.pinInitialCircle}>
+                              <Text style={styles.pinInitialLetter}>{person.initial}</Text>
+                            </View>
+                          ) : (
+                            <Image source={{ uri: person.avatarUrl }} style={styles.pinPhoto} />
+                          )}
+                        </View>
+                        {/* DEMO Tag under pin */}
+                        <View style={styles.pinDemoBadge}>
+                          <Text style={styles.pinDemoText}>DEMO</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                /* Privacy Mode: When Location Discovery is OFF, no user is visible and you are not visible */
+                <View style={styles.mapPrivacyOverlay}>
+                  <View style={styles.mapPrivacyCard}>
+                    <MapPin size={26} color={colors.primary} style={{ marginBottom: 8 }} />
+                    <Text style={styles.mapPrivacyTitle}>Location Discovery is Off</Text>
+                    <Text style={styles.mapPrivacySubtitle}>
+                      Enable location discovery to see nearby people on the map and allow others to find you.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.enableButtonSmall}
+                      onPress={handleEnableLocation}
+                      activeOpacity={0.85}
+                    >
+                      <LinearGradient
+                        colors={[colors.gradientStart, colors.gradientEnd]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.enableButtonSmallGradient}
+                      >
+                        <Crosshair size={14} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
+                        <Text style={styles.enableButtonSmallText}>Enable location discovery</Text>
+                      </LinearGradient>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  </View>
+                </View>
+              )}
 
               {/* Floating Map Controls on Right Edge */}
               <View style={styles.mapControlsColumn}>
@@ -520,79 +553,93 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
               <View style={styles.mapBottomSheet}>
                 <View style={styles.bottomSheetHeader}>
                   <Text style={styles.peopleNearbyTitle}>
-                    {filteredPeople.length} people nearby
+                    {isLocationActive ? `${filteredPeople.length} people nearby` : '0 people nearby'}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => setSegmentTab('people')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.seePeopleLink}>See people</Text>
-                  </TouchableOpacity>
+                  {isLocationActive ? (
+                    <TouchableOpacity
+                      onPress={() => setSegmentTab('people')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.seePeopleLink}>See people</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity onPress={handleEnableLocation}>
+                      <Text style={[styles.seePeopleLink, { color: colors.primary }]}>Enable</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Horizontal scroll cards */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.bottomCardsScroll}
-                >
-                  {filteredPeople.map((person) => {
-                    const isSelected = selectedUser?.id === person.id;
-                    return (
-                      <TouchableOpacity
-                        key={person.id}
-                        style={[
-                          styles.mapUserCard,
-                          isSelected && {
-                            borderColor: colors.primary,
-                            backgroundColor: 'rgba(224, 40, 125, 0.12)',
-                          },
-                        ]}
-                        onPress={() => {
-                          setSelectedUser(person);
-                          if (onOpenProfile) onOpenProfile(person.id);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        {person.isInitialAvatar ? (
-                          <View
-                            style={[
-                              styles.cardInitialCircle,
-                              { backgroundColor: '#1F1937', borderColor: colors.primary },
-                            ]}
-                          >
-                            <Text style={[styles.cardInitialText, { color: colors.primary }]}>
-                              {person.initial}
+                {isLocationActive ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.bottomCardsScroll}
+                  >
+                    {filteredPeople.map((person) => {
+                      const isSelected = selectedUser?.id === person.id;
+                      return (
+                        <TouchableOpacity
+                          key={person.id}
+                          style={[
+                            styles.mapUserCard,
+                            isSelected && {
+                              borderColor: colors.primary,
+                              backgroundColor: 'rgba(224, 40, 125, 0.12)',
+                            },
+                          ]}
+                          onPress={() => {
+                            setSelectedUser(person);
+                            if (onOpenProfile) onOpenProfile(person.id);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          {person.isInitialAvatar ? (
+                            <View
+                              style={[
+                                styles.cardInitialCircle,
+                                { backgroundColor: '#1F1937', borderColor: colors.primary },
+                              ]}
+                            >
+                              <Text style={[styles.cardInitialText, { color: colors.primary }]}>
+                                {person.initial}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View
+                              style={[
+                                styles.cardPhotoWrapper,
+                                { borderColor: colors.primary },
+                              ]}
+                            >
+                              <Image
+                                source={{ uri: person.avatarUrl }}
+                                style={styles.cardPhoto}
+                              />
+                            </View>
+                          )}
+                          <View style={styles.cardInfo}>
+                            <View style={styles.nameRow}>
+                              <Text style={styles.cardNameText}>{person.fullName}</Text>
+                              <View style={styles.demoBadge}>
+                                <Text style={styles.demoBadgeText}>DEMO</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.cardDistanceText}>
+                              {person.distance} away
                             </Text>
                           </View>
-                        ) : (
-                          <View
-                            style={[
-                              styles.cardPhotoWrapper,
-                              { borderColor: colors.primary },
-                            ]}
-                          >
-                            <Image
-                              source={{ uri: person.avatarUrl }}
-                              style={styles.cardPhoto}
-                            />
-                          </View>
-                        )}
-                        <View style={styles.cardInfo}>
-                          <View style={styles.nameRow}>
-                            <Text style={styles.cardNameText}>{person.fullName}</Text>
-                            <View style={styles.demoBadge}>
-                              <Text style={styles.demoBadgeText}>DEMO</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.cardDistanceText}>
-                            {person.distance} away
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+                    <Text style={{ color: '#94A3B8', fontSize: 12 }}>
+                      Enable location discovery to see nearby members here.
+                    </Text>
+                  </View>
+                )}
 
                 {/* Map attribution notice */}
                 <View style={styles.mapAttribution}>
@@ -614,68 +661,101 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 100 }}
           >
-            <View style={styles.peopleHeaderSection}>
-              <Text style={styles.peopleListTitle}>
-                People nearby {filteredPeople.length}
-              </Text>
-            </View>
+            {isLocationActive ? (
+              <>
+                <View style={styles.peopleHeaderSection}>
+                  <Text style={styles.peopleListTitle}>
+                    People nearby {filteredPeople.length}
+                  </Text>
+                </View>
 
-            {filteredPeople.map((person) => (
-              <TouchableOpacity
-                key={person.id}
-                style={styles.peopleCard}
-                onPress={() => onOpenProfile && onOpenProfile(person.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.peopleCardLeft}>
-                  {person.isInitialAvatar ? (
-                    <View
-                      style={[
-                        styles.avatarInitialCircle,
-                        { backgroundColor: '#1F1937', borderColor: colors.primary },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.avatarInitialLetter,
-                          { color: colors.primary },
-                        ]}
-                      >
-                        {person.initial}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.avatarImageWrapper,
-                        { borderColor: colors.primary },
-                      ]}
-                    >
-                      <Image
-                        source={{ uri: person.avatarUrl }}
-                        style={styles.avatarPhoto}
-                      />
-                    </View>
-                  )}
-
-                  <View style={styles.peopleMeta}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.fullNameText}>{person.fullName}</Text>
-                      {person.isDemo && (
-                        <View style={styles.demoBadge}>
-                          <Text style={styles.demoBadgeText}>DEMO</Text>
+                {filteredPeople.map((person) => (
+                  <TouchableOpacity
+                    key={person.id}
+                    style={styles.peopleCard}
+                    onPress={() => onOpenProfile && onOpenProfile(person.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.peopleCardLeft}>
+                      {person.isInitialAvatar ? (
+                        <View
+                          style={[
+                            styles.avatarInitialCircle,
+                            { backgroundColor: '#1F1937', borderColor: colors.primary },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.avatarInitialLetter,
+                              { color: colors.primary },
+                            ]}
+                          >
+                            {person.initial}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View
+                          style={[
+                            styles.avatarImageWrapper,
+                            { borderColor: colors.primary },
+                          ]}
+                        >
+                          <Image
+                            source={{ uri: person.avatarUrl }}
+                            style={styles.avatarPhoto}
+                          />
                         </View>
                       )}
+
+                      <View style={styles.peopleMeta}>
+                        <View style={styles.nameRow}>
+                          <Text style={styles.fullNameText}>{person.fullName}</Text>
+                          {person.isDemo && (
+                            <View style={styles.demoBadge}>
+                              <Text style={styles.demoBadgeText}>DEMO</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.usernameText}>@{person.username}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.usernameText}>@{person.username}</Text>
+
+                    <View style={styles.peopleCardRight}>
+                      <Text style={styles.distanceTag}>{person.distance}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : (
+              <View style={styles.nearbyPermissionContainer}>
+                <View style={styles.radarGraphicWrapper}>
+                  <View style={styles.radarOuterGlowRing}>
+                    <View style={styles.radarInnerGlowRing}>
+                      <Users size={32} color={colors.primary} />
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.peopleCardRight}>
-                  <Text style={styles.distanceTag}>{person.distance}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                <Text style={styles.nearbyHeadline}>Location discovery is off.</Text>
+                <Text style={styles.nearbySubtitle}>
+                  Enable location discovery to see people around you and allow them to discover you.
+                </Text>
+                <TouchableOpacity
+                  style={styles.enableButtonWrapper}
+                  onPress={handleEnableLocation}
+                  activeOpacity={0.88}
+                >
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.enableButtonGradient}
+                  >
+                    <Crosshair size={18} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: 8 }} />
+                    <Text style={styles.enableButtonText}>Enable location discovery</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
         )}
       </View>
@@ -1028,6 +1108,60 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     backgroundColor: 'rgba(138, 43, 226, 0.03)',
+  },
+
+  // PRIVACY OVERLAY (When Location Discovery is OFF)
+  mapPrivacyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(11, 8, 20, 0.65)',
+  },
+  mapPrivacyCard: {
+    backgroundColor: 'rgba(22, 17, 41, 0.95)',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(224, 40, 125, 0.35)',
+    padding: 20,
+    alignItems: 'center',
+    maxWidth: 280,
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  mapPrivacyTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  mapPrivacySubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  enableButtonSmall: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  enableButtonSmallGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  enableButtonSmallText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
 
   // MAP PINS CLUSTER
