@@ -12,6 +12,7 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { HomeScreen } from './src/screens/HomeScreen';
 import { FeedHomeScreen } from './src/screens/FeedHomeScreen';
 import { ReelsScreen } from './src/screens/ReelsScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
@@ -161,14 +162,12 @@ const MainNavigator: React.FC = () => {
       <View style={styles.appContainer}>
         {/* Tab Screen Content */}
         <View style={styles.contentArea}>
-          {/* Tab 1: Instagram-Style Home Feed (Stories + Welcome + Suggested for You + Posts) */}
+          {/* Tab 1: Immersive Video Feed Home Page matching screenshot */}
           {activeTab === 'home' && (
-            <FeedHomeScreen
-              onOpenCreate={() => setCurrentScreen('create_video')}
+            <HomeScreen
+              onOpenSearch={() => setActiveTab('explore')}
               onOpenNotifications={() => setActiveTab('chat')}
               onOpenChat={() => setActiveTab('chat')}
-              onOpenExplore={() => setActiveTab('explore')}
-              onOpenMap={() => setCurrentScreen('maps')}
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
