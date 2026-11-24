@@ -978,42 +978,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* 4. FLOATING MINI PREVIEW CARD (Always on top with zIndex: 300, clicking toggles & closes Deck Mode!) */}
-      <TouchableOpacity
-        style={styles.floatingMiniPreviewDeck}
-        onPress={() => {
-          if (isDeckMode) {
-            setIsDeckMode(false);
-          } else {
-            handleOpenDeckMode();
-          }
-        }}
-        activeOpacity={0.85}
-      >
-        {/* Stack 3D Layer Underlay */}
-        <View style={styles.deckCardUnderlay} />
-        {/* Main Preview Card */}
-        <View style={styles.deckCardMain}>
-          <Image
-            source={{ uri: nextReel?.thumbnailUrl || videos[currentIndex]?.thumbnailUrl }}
-            style={styles.deckThumbnail}
-          />
-          {/* Badge: 📹 index/15 */}
-          <View style={styles.deckBadge}>
-            <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
-            <Text style={styles.deckBadgeText}>
-              {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
-            </Text>
-          </View>
-          {/* Mini Creator Avatar Badge */}
-          <View style={styles.deckAvatarBadge}>
+      {/* 4. FLOATING MINI PREVIEW CARD (Hidden when New Reply, Video Comments, or Comments are open) */}
+      {!selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
+        <TouchableOpacity
+          style={styles.floatingMiniPreviewDeck}
+          onPress={() => {
+            if (isDeckMode) {
+              setIsDeckMode(false);
+            } else {
+              handleOpenDeckMode();
+            }
+          }}
+          activeOpacity={0.85}
+        >
+          {/* Stack 3D Layer Underlay */}
+          <View style={styles.deckCardUnderlay} />
+          {/* Main Preview Card */}
+          <View style={styles.deckCardMain}>
             <Image
-              source={{ uri: nextReel?.user?.avatarUrl || videos[currentIndex]?.user?.avatarUrl }}
-              style={styles.deckAvatarImg}
+              source={{ uri: nextReel?.thumbnailUrl || videos[currentIndex]?.thumbnailUrl }}
+              style={styles.deckThumbnail}
             />
+            {/* Badge: 📹 index/15 */}
+            <View style={styles.deckBadge}>
+              <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
+              <Text style={styles.deckBadgeText}>
+                {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
+              </Text>
+            </View>
+            {/* Mini Creator Avatar Badge */}
+            <View style={styles.deckAvatarBadge}>
+              <Image
+                source={{ uri: nextReel?.user?.avatarUrl || videos[currentIndex]?.user?.avatarUrl }}
+                style={styles.deckAvatarImg}
+              />
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
       {/* 5. VIDEO COMMENTS 3-COLUMN MODAL (Opens when clicking 15-grid button) */}
       <VideoCommentsModal
