@@ -148,15 +148,16 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
     setIsSubmitting(false);
   };
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.bottomSheet, { backgroundColor: colors.surface }]}>
+    <View style={styles.modalOverlay}>
+      <TouchableOpacity
+        style={styles.backdropDismiss}
+        onPress={onClose}
+        activeOpacity={1}
+      />
+      <View style={[styles.bottomSheet, { backgroundColor: colors.surface }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -340,15 +341,18 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
           </View>
         </View>
       </View>
-    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
+  },
+  backdropDismiss: {
+    flex: 1,
   },
   bottomSheet: {
     height: '68%',

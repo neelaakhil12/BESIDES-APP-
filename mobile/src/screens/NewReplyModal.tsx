@@ -157,31 +157,32 @@ export const NewReplyModal: React.FC<NewReplyModalProps> = ({
     }, 600);
   };
 
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalBackdrop}>
-        <View style={styles.container}>
-          {/* 1. Header (New Reply + Close Button) */}
-          <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>New Reply</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeBtn}
-              activeOpacity={0.7}
-            >
-              <X size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+  if (!visible) return null;
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+  return (
+    <View style={styles.modalOverlay}>
+      <TouchableOpacity
+        style={styles.backdropDismiss}
+        onPress={onClose}
+        activeOpacity={1}
+      />
+      <View style={styles.container}>
+        {/* 1. Header (New Reply + Close Button) */}
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>New Reply</Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            activeOpacity={0.7}
           >
+            <X size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
             {/* 2. Main Camera / Recording Preview Box */}
             <View style={styles.cameraPreviewBox}>
               {hasRecordedMedia && recordedVideoUri ? (
@@ -350,24 +351,33 @@ export const NewReplyModal: React.FC<NewReplyModalProps> = ({
           </ScrollView>
         </View>
       </View>
-    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 260,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
+  backdropDismiss: {
+    flex: 1,
+  },
   container: {
-    backgroundColor: '#0A0718',
+    backgroundColor: '#0F0B1E',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(224, 40, 125, 0.35)',
     maxHeight: '92%',
     paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 20,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
@@ -402,7 +412,7 @@ const styles = StyleSheet.create({
   // 2. Camera Preview Box
   cameraPreviewBox: {
     width: '100%',
-    height: 320,
+    height: 250,
     borderRadius: 20,
     backgroundColor: '#130E26',
     borderWidth: 1.5,
