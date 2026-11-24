@@ -197,13 +197,14 @@ const MainNavigator: React.FC = () => {
             />
           )}
 
-          {/* Tab 4: Explore / Search */}
+          {/* Tab 4: Explore / Nearby / Map / People */}
           {activeTab === 'explore' && (
             <ExploreScreen
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
               }}
+              onOpenChat={() => setActiveTab('chat')}
             />
           )}
 

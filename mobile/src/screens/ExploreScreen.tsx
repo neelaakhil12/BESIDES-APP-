@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,266 +9,1295 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
-import { Search, Flame, Hash, User, Film, Play } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  Radio,
+  Map as MapIcon,
+  Users,
+  Compass,
+  Search,
+  Bell,
+  MapPin,
+  Shield,
+  Plus,
+  Minus,
+  Crosshair,
+  Navigation,
+  SlidersHorizontal,
+  MessageCircle,
+  UserCheck,
+  Check,
+} from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
-import api from '../services/api';
-import { MOCK_TRENDING_TAGS, MOCK_VIDEOS, MOCK_USERS } from '../services/mockData';
+import { MOCK_EXPLORE_PEOPLE } from '../services/mockData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface ExploreScreenProps {
-  onSelectVideo?: (video: any) => void;
   onOpenProfile?: (userId: string) => void;
+  onOpenChat?: () => void;
+  onSelectVideo?: (video: any) => void;
 }
 
 export const ExploreScreen: React.FC<ExploreScreenProps> = ({
-  onSelectVideo,
   onOpenProfile,
+  onOpenChat,
 }) => {
-  const { colors, isDark } = useTheme();
-  const [activeTab, setActiveTab] = useState<'trending' | 'hashtags' | 'users' | 'videos'>('trending');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [trendingTags, setTrendingTags] = useState<any[]>(MOCK_TRENDING_TAGS);
-  const [videos, setVideos] = useState<any[]>(MOCK_VIDEOS);
-  const [users, setUsers] = useState<any[]>(Object.values(MOCK_USERS));
+  const { colors } = useTheme();
 
-  const fetchExploreData = async () => {
-    try {
-      const res = await api.get(`/explore?q=${encodeURIComponent(searchQuery)}&tab=${activeTab}`);
-      if (res.data?.success) {
-        setTrendingTags(res.data.trendingHashtags || MOCK_TRENDING_TAGS);
-        setVideos(res.data.videos || MOCK_VIDEOS);
-        setUsers(res.data.users || Object.values(MOCK_USERS));
-      } else {
-        setTrendingTags(MOCK_TRENDING_TAGS);
-        setVideos(MOCK_VIDEOS);
-        setUsers(Object.values(MOCK_USERS));
-      }
-    } catch (err) {
-      setTrendingTags(MOCK_TRENDING_TAGS);
-      setVideos(MOCK_VIDEOS);
-      setUsers(Object.values(MOCK_USERS));
-    }
+  // Top header toggle: 'following' | 'for_you'
+  const [headerFeedTab, setHeaderFeedTab] = useState<'following' | 'for_you'>('for_you');
+
+  // Main 3-segment switcher: 'nearby' | 'map' | 'people'
+  const [segmentTab, setSegmentTab] = useState<'nearby' | 'map' | 'people'>('nearby');
+
+  // Location discovery permission state
+  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
+
+  // Filter distance (e.g. 100m, 300m, 500m, 1km)
+  const [distanceFilter, setDistanceFilter] = useState('Within 100 m');
+  const [isDiscoverable, setIsDiscoverable] = useState(true);
+
+  // Selected user for map pin highlight
+  const [selectedUser, setSelectedUser] = useState<any | null>(MOCK_EXPLORE_PEOPLE[0]);
+
+  // Search mode toggle
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Map zoom level simulation
+  const [mapZoom, setMapZoom] = useState(1);
+
+  // Cycle distance filter
+  const cycleDistance = () => {
+    if (distanceFilter === 'Within 100 m') setDistanceFilter('Within 300 m');
+    else if (distanceFilter === 'Within 300 m') setDistanceFilter('Within 500 m');
+    else if (distanceFilter === 'Within 500 m') setDistanceFilter('Within 1 km');
+    else setDistanceFilter('Within 100 m');
   };
 
-  useEffect(() => {
-    fetchExploreData();
-  }, [activeTab, searchQuery]);
+  const handleEnableLocation = () => {
+    setIsLocationEnabled(true);
+    setSegmentTab('map');
+  };
+
+  const filteredPeople = MOCK_EXPLORE_PEOPLE.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      p.fullName.toLowerCase().includes(q) ||
+      p.username.toLowerCase().includes(q)
+    );
+  });
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      {/* Search Input Bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-        <Search size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search users, videos, #hashtags"
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+    <View style={[styles.container, { backgroundColor: '#0B0814' }]}>
+      {/* 1. TOP HEADER (Brand Logo + "Sirla Hills", Following | For You, Search, Bell) */}
+      <View style={styles.topHeader}>
+        {/* Left: Logo + Location Label */}
+        <View style={styles.headerLeft}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logoBadge}
+          >
+            <Text style={styles.logoBadgeText}>b</Text>
+          </LinearGradient>
+          <View style={styles.locationTagWrapper}>
+            <Text style={styles.locationTitle}>Sirla Hills</Text>
+          </View>
+        </View>
 
-      {/* Filter Tabs: Trending | Hashtags | Users | Videos */}
-      <View style={styles.tabsRow}>
-        {(['trending', 'hashtags', 'users', 'videos'] as const).map((tab) => {
-          const isActive = activeTab === tab;
-          const label = tab.charAt(0).toUpperCase() + tab.slice(1);
-
-          return (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab)}
+        {/* Center: Following | For You Pill */}
+        <View style={styles.headerCenterPill}>
+          <TouchableOpacity
+            style={[
+              styles.headerPillItem,
+              headerFeedTab === 'following' && styles.headerPillItemActive,
+            ]}
+            onPress={() => setHeaderFeedTab('following')}
+            activeOpacity={0.8}
+          >
+            <Text
               style={[
-                styles.tabItem,
-                isActive && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+                styles.headerPillText,
+                headerFeedTab === 'following' && { color: '#FFFFFF', fontWeight: '800' },
               ]}
             >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: isActive ? colors.primary : colors.textSecondary },
-                ]}
+              Following
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.headerPillItem,
+              headerFeedTab === 'for_you' && styles.headerPillItemActive,
+            ]}
+            onPress={() => setHeaderFeedTab('for_you')}
+            activeOpacity={0.8}
+          >
+            {headerFeedTab === 'for_you' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.headerPillGradient}
               >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Trending Now Section */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Trending Now 🔥
-        </Text>
-      </View>
-
-      {/* Trending Hashtag Cards Grid (Matching mockup #Travel, #Dance, #Comedy, #Food) */}
-      <View style={styles.trendingCardsGrid}>
-        {[
-          { name: 'Travel', count: '2.4M videos', bg: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300' },
-          { name: 'Dance', count: '6.7M videos', bg: 'https://images.unsplash.com/photo-1547153760-18fc86324498?w=300' },
-          { name: 'Comedy', count: '5.1M videos', bg: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-          { name: 'Food', count: '1.9M videos', bg: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300' },
-        ].map((card, idx) => (
-          <TouchableOpacity
-            key={idx}
-            style={styles.trendingCard}
-            onPress={() => setSearchQuery(card.name)}
-            activeOpacity={0.8}
-          >
-            <Image source={{ uri: card.bg }} style={styles.cardImage} />
-            <View style={styles.cardGradientOverlay}>
-              <Text style={styles.cardHashtagText}>#{card.name}</Text>
-              <Text style={styles.cardCountText}>{card.count}</Text>
-            </View>
+                <Text style={[styles.headerPillText, { color: '#FFFFFF', fontWeight: '800' }]}>
+                  For You
+                </Text>
+              </LinearGradient>
+            ) : (
+              <Text style={styles.headerPillText}>For You</Text>
+            )}
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {/* For You to Explore Section */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          For You to Explore
-        </Text>
-      </View>
-
-      {/* Video Discovery Grid */}
-      <View style={styles.videoGrid}>
-        {videos.map((vid) => (
+        {/* Right: Search & Bell Icons */}
+        <View style={styles.headerRight}>
           <TouchableOpacity
-            key={vid.id}
-            style={styles.gridVideoCard}
-            onPress={() => onSelectVideo && onSelectVideo(vid)}
+            style={styles.headerIconButton}
+            onPress={() => setShowSearchBar(!showSearchBar)}
+            activeOpacity={0.7}
+          >
+            <Search size={18} color="#FFFFFF" strokeWidth={2.2} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => onOpenChat && onOpenChat()}
+            activeOpacity={0.7}
+          >
+            <Bell size={18} color="#FFFFFF" strokeWidth={2.2} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Optional Search Bar Input */}
+      {showSearchBar && (
+        <View style={styles.searchBarContainer}>
+          <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search nearby users, hashtags, places..."
+            placeholderTextColor="#64748B"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+        </View>
+      )}
+
+      {/* 2. THREE-SEGMENT SWITCHER PILL (Nearby | Map | People) */}
+      <View style={styles.switcherContainer}>
+        <View style={styles.switcherTrack}>
+          {/* A. Nearby Tab */}
+          <TouchableOpacity
+            style={styles.segmentButton}
+            onPress={() => setSegmentTab('nearby')}
+            activeOpacity={0.85}
+          >
+            {segmentTab === 'nearby' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.segmentActiveGradient}
+              >
+                <Compass size={17} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentActiveText}>Nearby</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.segmentInactiveWrapper}>
+                <Compass size={17} color="#94A3B8" strokeWidth={2} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentInactiveText}>Nearby</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* B. Map Tab */}
+          <TouchableOpacity
+            style={styles.segmentButton}
+            onPress={() => setSegmentTab('map')}
+            activeOpacity={0.85}
+          >
+            {segmentTab === 'map' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.segmentActiveGradient}
+              >
+                <MapIcon size={17} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentActiveText}>Map</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.segmentInactiveWrapper}>
+                <MapIcon size={17} color="#94A3B8" strokeWidth={2} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentInactiveText}>Map</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* C. People Tab */}
+          <TouchableOpacity
+            style={styles.segmentButton}
+            onPress={() => setSegmentTab('people')}
+            activeOpacity={0.85}
+          >
+            {segmentTab === 'people' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.segmentActiveGradient}
+              >
+                <Users size={17} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentActiveText}>People</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.segmentInactiveWrapper}>
+                <Users size={17} color="#94A3B8" strokeWidth={2} style={{ marginRight: 6 }} />
+                <Text style={styles.segmentInactiveText}>People</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 3. SUB-FILTER BADGES (Within 100m • Discoverable) - Shown on Map & People */}
+      {(segmentTab === 'map' || segmentTab === 'people' || isLocationEnabled) && (
+        <View style={styles.filtersRow}>
+          <TouchableOpacity
+            style={styles.filterPill}
+            onPress={cycleDistance}
             activeOpacity={0.8}
           >
-            <Image
-              source={{
-                uri:
-                  vid.thumbnailUrl ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-              }}
-              style={styles.gridVideoThumbnail}
+            <Compass size={13} color={colors.primary} style={{ marginRight: 5 }} />
+            <Text style={styles.filterPillText}>{distanceFilter}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterPill, { marginLeft: 8 }]}
+            onPress={() => setIsDiscoverable(!isDiscoverable)}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: isDiscoverable ? '#00F2FE' : '#64748B' },
+              ]}
             />
-            <View style={styles.gridVideoOverlay}>
-              <Play size={10} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.gridVideoViews}>{vid.viewCount || '14.2K'}</Text>
-            </View>
+            <Text style={styles.filterPillText}>
+              {isDiscoverable ? 'Discoverable' : 'Hidden'}
+            </Text>
           </TouchableOpacity>
-        ))}
+        </View>
+      )}
+
+      {/* 4. MAIN CONTENT AREA DEPENDING ON ACTIVE SEGMENT */}
+      <View style={styles.contentContainer}>
+        {/* ============================================================== */}
+        {/* TAB 1: NEARBY (Permission Landing if not enabled) */}
+        {/* ============================================================== */}
+        {segmentTab === 'nearby' && !isLocationEnabled && (
+          <View style={styles.nearbyPermissionContainer}>
+            {/* Glowing Center Radar Pin */}
+            <View style={styles.radarGraphicWrapper}>
+              <View style={styles.radarOuterGlowRing}>
+                <View style={styles.radarInnerGlowRing}>
+                  <LinearGradient
+                    colors={['rgba(224, 40, 125, 0.35)', 'rgba(138, 43, 226, 0.35)']}
+                    style={styles.centerIconPill}
+                  >
+                    <MapPin size={34} color={colors.primary} strokeWidth={2.4} />
+                  </LinearGradient>
+                </View>
+              </View>
+            </View>
+
+            {/* Headline & Subtitle */}
+            <Text style={styles.nearbyHeadline}>People, closer to you.</Text>
+            <Text style={styles.nearbySubtitle}>
+              Find your community nearby. Your exact location is never shared.
+            </Text>
+
+            {/* Enable Location Discovery CTA Button */}
+            <TouchableOpacity
+              style={styles.enableButtonWrapper}
+              onPress={handleEnableLocation}
+              activeOpacity={0.88}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.enableButtonGradient}
+              >
+                <Crosshair size={18} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: 8 }} />
+                <Text style={styles.enableButtonText}>Enable location discovery</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Security note */}
+            <View style={styles.privacyNoteRow}>
+              <Shield size={14} color="#64748B" style={{ marginRight: 5 }} />
+              <Text style={styles.privacyNoteText}>Only while using Besides</Text>
+            </View>
+          </View>
+        )}
+
+        {/* If location is enabled and on 'nearby', render quick cards preview */}
+        {segmentTab === 'nearby' && isLocationEnabled && (
+          <View style={styles.nearbyEnabledContainer}>
+            <View style={styles.nearbyEnabledHeader}>
+              <Text style={styles.nearbyEnabledTitle}>Nearby Connections</Text>
+              <TouchableOpacity onPress={() => setSegmentTab('people')}>
+                <Text style={[styles.seeAllLink, { color: colors.primary }]}>View List</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90 }}>
+              {filteredPeople.map((person) => (
+                <TouchableOpacity
+                  key={person.id}
+                  style={styles.peopleCard}
+                  onPress={() => onOpenProfile && onOpenProfile(person.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.peopleCardLeft}>
+                    {person.isInitialAvatar ? (
+                      <View style={[styles.avatarInitialCircle, { backgroundColor: '#1F1937', borderColor: colors.primary }]}>
+                        <Text style={[styles.avatarInitialLetter, { color: colors.primary }]}>
+                          {person.initial}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.avatarImageWrapper, { borderColor: colors.primary }]}>
+                        <Image source={{ uri: person.avatarUrl }} style={styles.avatarPhoto} />
+                      </View>
+                    )}
+                    <View style={styles.peopleMeta}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.fullNameText}>{person.fullName}</Text>
+                        {person.isDemo && (
+                          <View style={styles.demoBadge}>
+                            <Text style={styles.demoBadgeText}>DEMO</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.usernameText}>@{person.username}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.peopleCardRight}>
+                    <Text style={styles.distanceTag}>{person.distance}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 2: MAP VIEW (Interactive Dark Mode Map with Cluster Pins) */}
+        {/* ============================================================== */}
+        {segmentTab === 'map' && (
+          <View style={styles.mapViewWrapper}>
+            {/* Styled Dark Cartography Surface with simulated street vectors */}
+            <View style={styles.mapCanvas}>
+              {/* Dark Map Street Grid Pattern Overlay */}
+              <View style={styles.mapGridStreets}>
+                {/* Diagonal roads */}
+                <View style={[styles.mapRoadLine, { top: '20%', left: 0, right: 0, transform: [{ rotate: '18deg' }] }]} />
+                <View style={[styles.mapRoadLine, { top: '45%', left: 0, right: 0, transform: [{ rotate: '-12deg' }] }]} />
+                <View style={[styles.mapRoadLine, { top: '70%', left: 0, right: 0, transform: [{ rotate: '8deg' }] }]} />
+                <View style={[styles.mapRoadLine, { left: '30%', top: 0, bottom: 0, transform: [{ rotate: '15deg' }] }]} />
+                <View style={[styles.mapRoadLine, { left: '65%', top: 0, bottom: 0, transform: [{ rotate: '-25deg' }] }]} />
+
+                {/* Suburbs & River Contours */}
+                <View style={styles.mapWaterBody} />
+                <View style={styles.mapParkArea} />
+              </View>
+
+              {/* Clustered User Pins (Matching Screenshot Clustered Formation) */}
+              <View style={styles.pinsClusterContainer}>
+                {filteredPeople.map((person, idx) => {
+                  const isSelected = selectedUser?.id === person.id;
+                  // Offsets to cluster them tightly around center as in screenshot
+                  const clusterOffsets = [
+                    { left: 100, top: 120, zIndex: 10 }, // Younus Khan
+                    { left: 145, top: 140, zIndex: 12 }, // Lena Vale
+                    { left: 170, top: 90, zIndex: 8 },   // Theo Park
+                    { left: 185, top: 130, zIndex: 9 },  // Sol Haddad
+                    { left: 155, top: 110, zIndex: 11 }, // Maya Ortiz
+                  ];
+                  const pos = clusterOffsets[idx % clusterOffsets.length];
+
+                  return (
+                    <TouchableOpacity
+                      key={person.id}
+                      style={[
+                        styles.mapPinItem,
+                        {
+                          left: pos.left,
+                          top: pos.top,
+                          zIndex: isSelected ? 20 : pos.zIndex,
+                        },
+                      ]}
+                      onPress={() => setSelectedUser(person)}
+                      activeOpacity={0.85}
+                    >
+                      <View
+                        style={[
+                          styles.pinAvatarRing,
+                          {
+                            borderColor: isSelected ? colors.primary : '#E0287D',
+                            shadowColor: colors.primary,
+                          },
+                        ]}
+                      >
+                        {person.isInitialAvatar ? (
+                          <View style={styles.pinInitialCircle}>
+                            <Text style={styles.pinInitialLetter}>{person.initial}</Text>
+                          </View>
+                        ) : (
+                          <Image source={{ uri: person.avatarUrl }} style={styles.pinPhoto} />
+                        )}
+                      </View>
+                      {/* DEMO Tag under pin */}
+                      <View style={styles.pinDemoBadge}>
+                        <Text style={styles.pinDemoText}>DEMO</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Floating Map Controls on Right Edge */}
+              <View style={styles.mapControlsColumn}>
+                <TouchableOpacity
+                  style={styles.mapControlButton}
+                  onPress={() => setMapZoom((prev) => Math.min(prev + 0.2, 2))}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mapControlButton}
+                  onPress={() => setMapZoom((prev) => Math.max(prev - 0.2, 0.6))}
+                  activeOpacity={0.7}
+                >
+                  <Minus size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mapControlButton}
+                  onPress={() => setSelectedUser(filteredPeople[0])}
+                  activeOpacity={0.7}
+                >
+                  <Crosshair size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mapControlButton}
+                  onPress={() => cycleDistance()}
+                  activeOpacity={0.7}
+                >
+                  <Navigation size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mapControlButton}
+                  onPress={() => cycleDistance()}
+                  activeOpacity={0.7}
+                >
+                  <SlidersHorizontal size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom Sheet Overlay: 5 People Nearby + Horizontal Cards */}
+              <View style={styles.mapBottomSheet}>
+                <View style={styles.bottomSheetHeader}>
+                  <Text style={styles.peopleNearbyTitle}>
+                    {filteredPeople.length} people nearby
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setSegmentTab('people')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.seePeopleLink}>See people</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Horizontal scroll cards */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.bottomCardsScroll}
+                >
+                  {filteredPeople.map((person) => {
+                    const isSelected = selectedUser?.id === person.id;
+                    return (
+                      <TouchableOpacity
+                        key={person.id}
+                        style={[
+                          styles.mapUserCard,
+                          isSelected && {
+                            borderColor: colors.primary,
+                            backgroundColor: 'rgba(224, 40, 125, 0.12)',
+                          },
+                        ]}
+                        onPress={() => {
+                          setSelectedUser(person);
+                          if (onOpenProfile) onOpenProfile(person.id);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        {person.isInitialAvatar ? (
+                          <View
+                            style={[
+                              styles.cardInitialCircle,
+                              { backgroundColor: '#1F1937', borderColor: colors.primary },
+                            ]}
+                          >
+                            <Text style={[styles.cardInitialText, { color: colors.primary }]}>
+                              {person.initial}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View
+                            style={[
+                              styles.cardPhotoWrapper,
+                              { borderColor: colors.primary },
+                            ]}
+                          >
+                            <Image
+                              source={{ uri: person.avatarUrl }}
+                              style={styles.cardPhoto}
+                            />
+                          </View>
+                        )}
+                        <View style={styles.cardInfo}>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.cardNameText}>{person.fullName}</Text>
+                            <View style={styles.demoBadge}>
+                              <Text style={styles.demoBadgeText}>DEMO</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.cardDistanceText}>
+                            {person.distance} away
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Map attribution notice */}
+                <View style={styles.mapAttribution}>
+                  <Text style={styles.mapAttributionText}>
+                    Leaflet | Tiles © Esri — Esri, HERE, Garmin, USGS, © OpenStreetMap contributors
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 3: PEOPLE VIEW (Clean vertical list matching screenshot)   */}
+        {/* ============================================================== */}
+        {segmentTab === 'people' && (
+          <ScrollView
+            style={styles.peopleListScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100 }}
+          >
+            <View style={styles.peopleHeaderSection}>
+              <Text style={styles.peopleListTitle}>
+                People nearby {filteredPeople.length}
+              </Text>
+            </View>
+
+            {filteredPeople.map((person) => (
+              <TouchableOpacity
+                key={person.id}
+                style={styles.peopleCard}
+                onPress={() => onOpenProfile && onOpenProfile(person.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.peopleCardLeft}>
+                  {person.isInitialAvatar ? (
+                    <View
+                      style={[
+                        styles.avatarInitialCircle,
+                        { backgroundColor: '#1F1937', borderColor: colors.primary },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.avatarInitialLetter,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {person.initial}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.avatarImageWrapper,
+                        { borderColor: colors.primary },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: person.avatarUrl }}
+                        style={styles.avatarPhoto}
+                      />
+                    </View>
+                  )}
+
+                  <View style={styles.peopleMeta}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.fullNameText}>{person.fullName}</Text>
+                      {person.isDemo && (
+                        <View style={styles.demoBadge}>
+                          <Text style={styles.demoBadgeText}>DEMO</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.usernameText}>@{person.username}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.peopleCardRight}>
+                  <Text style={styles.distanceTag}>{person.distance}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0B0814',
   },
-  searchBar: {
+  // TOP HEADER
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    fontStyle: 'italic',
+  },
+  locationTagWrapper: {
+    marginLeft: 8,
+  },
+  locationTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  headerCenterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 18,
+    padding: 3,
+  },
+  headerPillItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  headerPillItemActive: {
+    backgroundColor: 'transparent',
+  },
+  headerPillGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  headerPillText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // SEARCH BAR
+  searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 12,
     marginBottom: 8,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 18,
     paddingHorizontal: 14,
+    height: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   searchInput: {
     flex: 1,
+    color: '#FFFFFF',
     fontSize: 13,
   },
-  tabsRow: {
+
+  // 3-SEGMENT SWITCHER
+  switcherContainer: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  switcherTrack: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 24,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  tabItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  segmentButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabLabel: {
+  segmentActiveGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  segmentActiveText: {
+    color: '#FFFFFF',
     fontSize: 13,
+    fontWeight: '800',
+  },
+  segmentInactiveWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  segmentInactiveText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // SUB-FILTERS ROW
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(224, 40, 125, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(224, 40, 125, 0.3)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  filterPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '700',
   },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    marginVertical: 10,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
-  sectionTitle: {
+
+  // CONTENT CONTAINER
+  contentContainer: {
+    flex: 1,
+  },
+
+  // TAB 1: NEARBY PERMISSION SCREEN
+  nearbyPermissionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 60,
+  },
+  radarGraphicWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  radarOuterGlowRing: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1,
+    borderColor: 'rgba(224, 40, 125, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(224, 40, 125, 0.04)',
+  },
+  radarInnerGlowRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    borderColor: 'rgba(138, 43, 226, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(138, 43, 226, 0.08)',
+  },
+  centerIconPill: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(224, 40, 125, 0.8)',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  nearbyHeadline: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: -0.4,
+  },
+  nearbySubtitle: {
+    color: '#94A3B8',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 28,
+    paddingHorizontal: 12,
+  },
+  enableButtonWrapper: {
+    width: '100%',
+    maxWidth: 290,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+    marginBottom: 16,
+  },
+  enableButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  enableButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  privacyNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  privacyNoteText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // NEARBY ENABLED PREVIEW
+  nearbyEnabledContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  nearbyEnabledHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  nearbyEnabledTitle: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
   },
-  trendingCardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    justifyContent: 'space-between',
-    marginBottom: 16,
+  seeAllLink: {
+    fontSize: 13,
+    fontWeight: '700',
   },
-  trendingCard: {
-    width: '48%',
-    height: 90,
-    borderRadius: 14,
+
+  // TAB 2: MAP VIEW
+  mapViewWrapper: {
+    flex: 1,
+    position: 'relative',
     overflow: 'hidden',
-    marginBottom: 10,
+  },
+  mapCanvas: {
+    flex: 1,
+    backgroundColor: '#0F0C1B',
     position: 'relative',
   },
-  cardImage: {
+  mapGridStreets: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  mapRoadLine: {
+    position: 'absolute',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  mapWaterBody: {
+    position: 'absolute',
+    top: '5%',
+    right: '-10%',
+    width: 200,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(0, 242, 254, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 242, 254, 0.1)',
+  },
+  mapParkArea: {
+    position: 'absolute',
+    bottom: '25%',
+    left: '-5%',
+    width: 160,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(138, 43, 226, 0.03)',
+  },
+
+  // MAP PINS CLUSTER
+  pinsClusterContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapPinItem: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  pinAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2.5,
+    overflow: 'hidden',
+    backgroundColor: '#161129',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.65,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  pinInitialCircle: {
     width: '100%',
     height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E1836',
   },
-  cardGradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-    padding: 10,
+  pinInitialLetter: {
+    color: '#00F2FE',
+    fontSize: 18,
+    fontWeight: '900',
   },
-  cardHashtagText: {
+  pinPhoto: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  pinDemoBadge: {
+    marginTop: -4,
+    backgroundColor: 'rgba(224, 40, 125, 0.95)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  pinDemoText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+
+  // FLOATING MAP CONTROLS
+  mapControlsColumn: {
+    position: 'absolute',
+    right: 14,
+    top: 20,
+    gap: 8,
+    zIndex: 30,
+  },
+  mapControlButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(22, 17, 41, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+
+  // MAP BOTTOM SHEET
+  mapBottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 10,
+    paddingBottom: 68,
+    backgroundColor: 'rgba(11, 8, 20, 0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  peopleNearbyTitle: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },
-  cardCountText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 2,
+  seePeopleLink: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
-  videoGrid: {
+  bottomCardsScroll: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  mapUserCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingBottom: 20,
+    alignItems: 'center',
+    backgroundColor: '#161129',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 160,
   },
-  gridVideoCard: {
-    width: '33.33%',
-    height: 140,
-    padding: 1,
-    position: 'relative',
+  cardInitialCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  gridVideoThumbnail: {
+  cardInitialText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  cardPhotoWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    marginRight: 10,
+  },
+  cardPhoto: {
     width: '100%',
     height: '100%',
   },
-  gridVideoOverlay: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
+  cardInfo: {
+    justifyContent: 'center',
+  },
+  cardNameText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginRight: 6,
+  },
+  cardDistanceText: {
+    color: '#00F2FE',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  mapAttribution: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  mapAttributionText: {
+    color: '#64748B',
+    fontSize: 8,
+    textAlign: 'center',
+  },
+
+  // TAB 3: PEOPLE VIEW
+  peopleListScroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  peopleHeaderSection: {
+    paddingVertical: 10,
+  },
+  peopleListTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  peopleCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    justifyContent: 'space-between',
+    backgroundColor: '#161129',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  peopleCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarInitialCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarInitialLetter: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  avatarImageWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  avatarPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  peopleMeta: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fullNameText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: 6,
+  },
+  demoBadge: {
+    backgroundColor: 'rgba(224, 40, 125, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(224, 40, 125, 0.6)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderRadius: 6,
   },
-  gridVideoViews: {
+  demoBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  usernameText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  peopleCardRight: {
+    paddingLeft: 10,
+  },
+  distanceTag: {
+    color: '#00F2FE',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

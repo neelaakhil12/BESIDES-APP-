@@ -43,6 +43,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           >
             Home
           </Text>
+          {currentTab === 'home' && <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />}
         </TouchableOpacity>
 
         {/* 2. Explore Tab (Compass) */}
@@ -64,6 +65,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           >
             Explore
           </Text>
+          {currentTab === 'explore' && <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />}
         </TouchableOpacity>
 
         {/* 3. Center Elevated Create (+) Button */}
@@ -104,6 +106,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           >
             Chats
           </Text>
+          {currentTab === 'chat' && <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />}
         </TouchableOpacity>
 
         {/* 5. Me Tab (Avatar) */}
@@ -130,6 +133,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           >
             Me
           </Text>
+          {currentTab === 'me' && <View style={[styles.activeUnderline, { backgroundColor: colors.primary }]} />}
         </TouchableOpacity>
       </View>
     </View>
@@ -173,6 +177,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
     letterSpacing: -0.1,
+  },
+  activeUnderline: {
+    width: 14,
+    height: 2.5,
+    borderRadius: 1.5,
+    marginTop: 2,
   },
   createButtonWrapper: {
     marginHorizontal: 4,
