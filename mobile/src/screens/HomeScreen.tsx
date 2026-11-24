@@ -33,6 +33,8 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { CommentsModal } from './CommentsModal';
+import { VideoCommentsModal } from './VideoCommentsModal';
+import { NewReplyModal } from './NewReplyModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
 const CARD_WIDTH = 295;
@@ -111,6 +113,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Deck Mode toggle (triggered by clicking preview card or grid icon)
   const [isDeckMode, setIsDeckMode] = useState(false);
 
+  // Deck Mode origin: 'reel' (from preview card) or 'comments' (from VideoCommentsModal)
+  const [deckSource, setDeckSource] = useState<'reel' | 'comments'>('reel');
+
+  // Video Comments Modal (Grid of 15 replies)
+  const [isVideoCommentsOpen, setIsVideoCommentsOpen] = useState(false);
+
+  // New Reply Modal (15s video recorder/uploader)
+  const [selectedVideoForReply, setSelectedVideoForReply] = useState<any | null>(null);
+
   // Active index when browsing in 3D Card Deck mode
   const [deckActiveIndex, setDeckActiveIndex] = useState(0);
 
@@ -140,13 +151,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     deckActiveIndexRef.current = deckActiveIndex;
   }, [deckActiveIndex]);
 
-  // Open 3D Card Deck Mode
+  // Open 3D Card Deck Mode from Reel Preview Card
   const handleOpenDeckMode = () => {
+    setDeckSource('reel');
     setDeckActiveIndex(currentIndex);
     deckActiveIndexRef.current = currentIndex;
     deckPanX.setValue(0);
     setIsDeckPaused(false);
     setIsDeckMode(true);
+  };
+
+  // Open 3D Card Deck Mode from Video Comments Grid
+  const handleOpenDeckFromComments = (index: number) => {
+    setDeckSource('comments');
+    setDeckActiveIndex(index);
+    deckActiveIndexRef.current = index;
+    deckPanX.setValue(0);
+    setIsDeckPaused(false);
+    setIsDeckMode(true);
+  };
+
+  // Close 3D Card Deck and return to Video Comments Grid
+  const handleCloseDeckToComments = () => {
+    setIsDeckMode(false);
+    if (deckSource === 'comments') {
+      setIsVideoCommentsOpen(true);
+    }
   };
 
   // Advance to next card in the deck (with smooth slide animation)
@@ -369,10 +399,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </TouchableOpacity>
 
-            {/* 2. Comments / Grid Button -> Opens 3D Deck Carousel */}
+            {/* 2. Video Comments / Grid Button -> Opens 3-Column Video Comments Sheet */}
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={handleOpenDeckMode}
+              onPress={() => {
+                setIsPaused(true);
+                setIsVideoCommentsOpen(true);
+              }}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -383,7 +416,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               >
                 <LayoutGrid size={18} color="#FFFFFF" strokeWidth={2.2} />
               </LinearGradient>
-              <Text style={styles.actionText}>{item.commentCount}</Text>
+              <Text style={styles.actionText}>{item.commentCount || 15}</Text>
             </TouchableOpacity>
 
             {/* 3. Share Paper Airplane */}
@@ -392,11 +425,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPress={onOpenChat}
               activeOpacity={0.7}
             >
-              <Send
-                size={24}
-                color="#FFFFFF"
-                strokeWidth={2}
-              />
+              <View style={styles.shareIconContainer}>
+                <Send
+                  size={24}
+                  color="#FFFFFF"
+                  strokeWidth={2}
+                />
+              </View>
               <Text style={styles.actionText}>
                 {item.shareCount > 999
                   ? `${(item.shareCount / 1000).toFixed(1)}K`
@@ -404,13 +439,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </TouchableOpacity>
 
-            {/* 4. Video Camera / Comment Button */}
+            {/* 4. Video Camera / New Reply Button */}
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => setSelectedVideoForComments(item)}
-              activeOpacity={0.7}
+              onPress={() => setSelectedVideoForReply(item)}
+              activeOpacity={0.8}
             >
-              <VideoIcon size={24} color="#FFFFFF" strokeWidth={2} />
+              <View style={styles.cameraCircleBtn}>
+                <VideoIcon size={22} color="#FFFFFF" strokeWidth={2} />
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -674,32 +711,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           )}
 
-          {/* Top Bar on Active Card (Avatar + ↩ @creator + LayoutGrid + Mute) */}
+          {/* Top Bar on Active Card (← @creator + Play/Pause + Mute) */}
           {isActive && (
             <View style={styles.deckCardTopBar}>
               <TouchableOpacity
                 style={styles.deckCardUserRow}
-                onPress={() => setIsDeckMode(false)}
+                onPress={() => {
+                  if (deckSource === 'comments') {
+                    handleCloseDeckToComments();
+                  } else {
+                    setIsDeckMode(false);
+                  }
+                }}
                 activeOpacity={0.8}
               >
-                <Image
-                  source={{ uri: videos[currentIndex]?.user?.avatarUrl || item.user.avatarUrl }}
-                  style={styles.deckCardTopAvatar}
-                />
-                <Undo2 size={13} color="#FFFFFF" style={{ marginRight: 5, marginLeft: 2 }} />
-                <Text style={styles.deckCardUsername}>
-                  @{videos[currentIndex]?.user?.username || 'maya.films'}
-                </Text>
+                <ArrowLeft size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.deckCardUsername}>@{item.user.username}</Text>
               </TouchableOpacity>
 
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {/* Grid Icon Button */}
+                {/* Play/Pause Button */}
                 <TouchableOpacity
                   style={[styles.deckCardMuteBtn, { marginRight: 8 }]}
-                  onPress={() => setIsDeckMode(false)}
+                  onPress={() => setIsDeckPaused((prev) => !prev)}
                   activeOpacity={0.8}
                 >
-                  <LayoutGrid size={15} color="#FFFFFF" />
+                  {isDeckPaused ? (
+                    <Play size={14} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                  ) : (
+                    <Pause size={14} color="#FFFFFF" fill="#FFFFFF" />
+                  )}
                 </TouchableOpacity>
 
                 {/* Volume Button */}
@@ -897,8 +938,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* 3. 3D STACKED CARD DECK OVERLAY (Cards physically stacked on top of each other) */}
       {isDeckMode && (
         <View style={styles.deckModeOverlay}>
-          {/* Semi-transparent Dimmer showing the stopped background reel */}
-          <View style={styles.deckBackdropDimmer} />
+          {/* Semi-transparent Dimmer showing either Video Comments grid or background reel */}
+          <TouchableOpacity
+            style={styles.deckBackdropDimmer}
+            onPress={deckSource === 'comments' ? handleCloseDeckToComments : () => setIsDeckMode(false)}
+            activeOpacity={1}
+          />
 
           {/* Interactive Stacked Cards Area */}
           <View style={styles.deckCarouselWrapper} {...panResponder.panHandlers}>
@@ -907,10 +952,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
 
-          {/* Bottom Deck Indicator Pill: "1/15 • ↩ Tap the Reel to resume • 0:01" */}
+          {/* Bottom Deck Indicator Pill */}
           <TouchableOpacity
             style={styles.deckResumeIndicator}
-            onPress={() => handleSelectReelFromDeck(deckActiveIndex)}
+            onPress={
+              deckSource === 'comments'
+                ? handleCloseDeckToComments
+                : () => handleSelectReelFromDeck(deckActiveIndex)
+            }
             activeOpacity={0.85}
           >
             <View style={styles.deckIndicatorRow}>
@@ -920,7 +969,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.deckResumeDot}> • </Text>
               <Undo2 size={12} color="#CBD5E1" style={{ marginRight: 4 }} />
               <Text style={styles.deckResumeText} numberOfLines={1}>
-                Tap the Reel to resume • 0:01
+                {deckSource === 'comments'
+                  ? 'Tap outside for all comments'
+                  : 'Tap the Reel to resume • 0:01'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -930,7 +981,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* 4. FLOATING MINI PREVIEW CARD (Always on top with zIndex: 300, clicking toggles & closes Deck Mode!) */}
       <TouchableOpacity
         style={styles.floatingMiniPreviewDeck}
-        onPress={() => setIsDeckMode((prev) => !prev)}
+        onPress={() => {
+          if (isDeckMode) {
+            setIsDeckMode(false);
+          } else {
+            handleOpenDeckMode();
+          }
+        }}
         activeOpacity={0.85}
       >
         {/* Stack 3D Layer Underlay */}
@@ -958,7 +1015,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* 5. COMMENTS MODAL */}
+      {/* 5. VIDEO COMMENTS 3-COLUMN MODAL (Opens when clicking 15-grid button) */}
+      <VideoCommentsModal
+        visible={isVideoCommentsOpen}
+        parentVideo={videos[currentIndex]}
+        replies={videos}
+        currentViewingIndex={isDeckMode ? deckActiveIndex : -1}
+        onClose={() => setIsVideoCommentsOpen(false)}
+        onSelectReply={(index) => {
+          handleOpenDeckFromComments(index);
+        }}
+        onOpenRecordReply={() => {
+          setIsVideoCommentsOpen(false);
+          setSelectedVideoForReply(videos[currentIndex]);
+        }}
+      />
+
+      {/* 6. NEW VIDEO REPLY MODAL (Opens when clicking Video Camera button) */}
+      {selectedVideoForReply && (
+        <NewReplyModal
+          visible={true}
+          video={selectedVideoForReply}
+          onClose={() => setSelectedVideoForReply(null)}
+          onReplyPosted={(reply) => {
+            console.log('Reply posted:', reply);
+          }}
+        />
+      )}
+
+      {/* 7. COMMENTS MODAL */}
       {selectedVideoForComments && (
         <CommentsModal
           visible={true}
@@ -1108,6 +1193,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 6,
+  },
+  shareIconContainer: {
+    width: 44,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraCircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(30, 24, 48, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
 
   // 3D STACKED PREVIEW DECK BUTTON

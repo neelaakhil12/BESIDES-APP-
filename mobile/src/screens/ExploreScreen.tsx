@@ -36,12 +36,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface ExploreScreenProps {
   onOpenProfile?: (userId: string) => void;
   onOpenChat?: () => void;
+  onOpenNotifications?: () => void;
   onSelectVideo?: (video: any) => void;
 }
 
 export const ExploreScreen: React.FC<ExploreScreenProps> = ({
   onOpenProfile,
   onOpenChat,
+  onOpenNotifications,
 }) => {
   const { colors } = useTheme();
 
@@ -172,7 +174,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
           <TouchableOpacity
             style={styles.headerIconButton}
-            onPress={() => onOpenChat && onOpenChat()}
+            onPress={() => (onOpenNotifications ? onOpenNotifications() : onOpenChat && onOpenChat())}
             activeOpacity={0.7}
           >
             <Bell size={18} color="#FFFFFF" strokeWidth={2.2} />

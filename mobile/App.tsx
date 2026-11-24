@@ -22,6 +22,7 @@ import { MapsScreen } from './src/screens/MapsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { CreateVideoScreen } from './src/screens/CreateVideoScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
 
 type AppScreen =
   | 'splash'
@@ -33,7 +34,8 @@ type AppScreen =
   | 'settings'
   | 'view_profile'
   | 'create_video'
-  | 'maps';
+  | 'maps'
+  | 'notifications';
 
 const MainNavigator: React.FC = () => {
   const { user, logout } = useAuth();
@@ -156,6 +158,41 @@ const MainNavigator: React.FC = () => {
     );
   }
 
+  // 10. Notifications Screen ("You're all caught up" in Beside Brand Colors)
+  if (currentScreen === 'notifications') {
+    return (
+      <MobileFrame>
+        <View style={styles.appContainer}>
+          <View style={styles.contentArea}>
+            <NotificationsScreen
+              onBack={() => setCurrentScreen('main')}
+              onOpenProfile={(id) => {
+                setSelectedProfileId(id);
+                setCurrentScreen('view_profile');
+              }}
+              onOpenChat={() => {
+                setActiveTab('chat');
+                setCurrentScreen('main');
+              }}
+            />
+          </View>
+          <BottomNavBar
+            currentTab={activeTab}
+            onSelectTab={(tab) => {
+              if (tab === 'create') {
+                setCurrentScreen('create_video');
+              } else {
+                setActiveTab(tab);
+                setCurrentScreen('main');
+              }
+            }}
+            userAvatarUrl={user?.profile?.avatarUrl}
+          />
+        </View>
+      </MobileFrame>
+    );
+  }
+
   // 10. Main 5-Tab Application Container (Home, Reels, Chat, Explore, Profile)
   return (
     <MobileFrame>
@@ -166,7 +203,7 @@ const MainNavigator: React.FC = () => {
           {activeTab === 'home' && (
             <HomeScreen
               onOpenSearch={() => setActiveTab('explore')}
-              onOpenNotifications={() => setActiveTab('chat')}
+              onOpenNotifications={() => setCurrentScreen('notifications')}
               onOpenChat={() => setActiveTab('chat')}
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
@@ -205,6 +242,7 @@ const MainNavigator: React.FC = () => {
                 setCurrentScreen('view_profile');
               }}
               onOpenChat={() => setActiveTab('chat')}
+              onOpenNotifications={() => setCurrentScreen('notifications')}
             />
           )}
 
