@@ -9,6 +9,7 @@ import {
   FlatList,
   Platform,
   PanResponder,
+  Animated,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -121,40 +122,94 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [containerWidth, setContainerWidth] = useState<number>(380);
 
   const flatListRef = useRef<FlatList>(null);
-  const deckListRef = useRef<FlatList>(null);
+  const deckPanX = useRef(new Animated.Value(0)).current;
+  const deckActiveIndexRef = useRef(0);
 
-  // Smoothly scroll deck to specific index
-  const scrollToDeckIndex = (index: number, animated = true) => {
-    const safeIdx = Math.max(0, Math.min(index, videos.length - 1));
-    setDeckActiveIndex(safeIdx);
-    deckListRef.current?.scrollToOffset({
-      offset: safeIdx * ITEM_WIDTH,
-      animated,
-    });
-  };
+  useEffect(() => {
+    deckActiveIndexRef.current = deckActiveIndex;
+  }, [deckActiveIndex]);
 
   // Open 3D Card Deck Mode
   const handleOpenDeckMode = () => {
     setDeckActiveIndex(currentIndex);
+    deckActiveIndexRef.current = currentIndex;
+    deckPanX.setValue(0);
     setIsDeckMode(true);
-    setTimeout(() => {
-      deckListRef.current?.scrollToOffset({
-        offset: currentIndex * ITEM_WIDTH,
-        animated: false,
-      });
-    }, 60);
   };
 
-  // PanResponder to enable smooth drag gestures with mouse on web and touch on mobile
+  // Advance to next card in the deck (with smooth slide animation)
+  const nextCard = () => {
+    if (deckActiveIndexRef.current < videos.length - 1) {
+      Animated.timing(deckPanX, {
+        toValue: -CARD_WIDTH - 60,
+        duration: 180,
+        useNativeDriver: false,
+      }).start(() => {
+        deckPanX.setValue(0);
+        setDeckActiveIndex((prev) => {
+          const next = Math.min(videos.length - 1, prev + 1);
+          deckActiveIndexRef.current = next;
+          return next;
+        });
+      });
+    }
+  };
+
+  // Return to previous card in the deck
+  const prevCard = () => {
+    if (deckActiveIndexRef.current > 0) {
+      Animated.timing(deckPanX, {
+        toValue: CARD_WIDTH + 60,
+        duration: 180,
+        useNativeDriver: false,
+      }).start(() => {
+        deckPanX.setValue(0);
+        setDeckActiveIndex((prev) => {
+          const next = Math.max(0, prev - 1);
+          deckActiveIndexRef.current = next;
+          return next;
+        });
+      });
+    }
+  };
+
+  // Keyboard navigation for web
+  useEffect(() => {
+    if (Platform.OS === 'web' && isDeckMode) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          nextCard();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          prevCard();
+        } else if (e.key === 'Escape') {
+          setIsDeckMode(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isDeckMode]);
+
+  // PanResponder to enable smooth drag gestures on web & mobile
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onPanResponderMove: (_, gestureState) => {
+        deckPanX.setValue(gestureState.dx);
+      },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -30 && deckActiveIndex < videos.length - 1) {
-          scrollToDeckIndex(deckActiveIndex + 1);
-        } else if (gestureState.dx > 30 && deckActiveIndex > 0) {
-          scrollToDeckIndex(deckActiveIndex - 1);
+        if (gestureState.dx < -45 && deckActiveIndexRef.current < videos.length - 1) {
+          nextCard();
+        } else if (gestureState.dx > 45 && deckActiveIndexRef.current > 0) {
+          prevCard();
+        } else {
+          Animated.spring(deckPanX, {
+            toValue: 0,
+            friction: 6,
+            tension: 50,
+            useNativeDriver: false,
+          }).start();
         }
       },
     })
@@ -246,202 +301,344 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           pointerEvents="none"
         />
 
-        {/* Floating Mute Button */}
-        <TouchableOpacity
-          style={styles.muteButton}
-          onPress={() => setIsMuted(!isMuted)}
-          activeOpacity={0.8}
-        >
-          {isMuted ? (
-            <VolumeX size={16} color="#FFFFFF" />
-          ) : (
-            <Volume2 size={16} color="#FFFFFF" />
-          )}
-        </TouchableOpacity>
-
-        {/* Right Side: Action Column */}
-        <View style={styles.rightActionsColumn}>
-          {/* 1. Like Heart */}
+        {/* Floating Mute Button (Hidden in deck mode so background is clean) */}
+        {!isDeckMode && (
           <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => toggleLike(index)}
-            activeOpacity={0.7}
+            style={styles.muteButton}
+            onPress={() => setIsMuted(!isMuted)}
+            activeOpacity={0.8}
           >
-            <Heart
-              size={28}
-              color={item.isLiked ? '#EF4444' : '#FFFFFF'}
-              fill={item.isLiked ? '#EF4444' : 'none'}
-              strokeWidth={2}
-            />
-            <Text style={styles.actionText}>
-              {item.likeCount > 999
-                ? `${(item.likeCount / 1000).toFixed(1)}K`
-                : item.likeCount}
-            </Text>
+            {isMuted ? (
+              <VolumeX size={16} color="#FFFFFF" />
+            ) : (
+              <Volume2 size={16} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
+        )}
 
-          {/* 2. Comments / Grid Button -> Opens 3D Deck Carousel */}
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={handleOpenDeckMode}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.commentGridBox}
+        {/* Right Side: Action Column (Hidden in deck mode) */}
+        {!isDeckMode && (
+          <View style={styles.rightActionsColumn}>
+            {/* 1. Like Heart */}
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => toggleLike(index)}
+              activeOpacity={0.7}
             >
-              <LayoutGrid size={18} color="#FFFFFF" strokeWidth={2.2} />
-            </LinearGradient>
-            <Text style={styles.actionText}>{item.commentCount}</Text>
-          </TouchableOpacity>
-
-          {/* 3. Share Paper Airplane */}
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={onOpenChat}
-            activeOpacity={0.7}
-          >
-            <Send
-              size={24}
-              color="#FFFFFF"
-              strokeWidth={2}
-              style={{ transform: [{ rotate: '-20deg' }] }}
-            />
-            <Text style={styles.actionText}>
-              {item.shareCount > 999
-                ? `${(item.shareCount / 1000).toFixed(1)}K`
-                : item.shareCount}
-            </Text>
-          </TouchableOpacity>
-
-          {/* 4. Video Camera / Comment Button */}
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => setSelectedVideoForComments(item)}
-            activeOpacity={0.7}
-          >
-            <VideoIcon size={24} color="#FFFFFF" strokeWidth={2} />
-          </TouchableOpacity>
-
-          {/* 5. Stacked Video Preview Deck Card (Tapping triggers 3D Card Deck Mode!) */}
-          <TouchableOpacity
-            style={styles.nextPreviewDeck}
-            onPress={handleOpenDeckMode}
-            activeOpacity={0.85}
-          >
-            {/* Stack 3D Layer Underlay */}
-            <View style={styles.deckCardUnderlay} />
-            {/* Main Preview Card */}
-            <View style={styles.deckCardMain}>
-              <Image
-                source={{ uri: nextReel?.thumbnailUrl || item.thumbnailUrl }}
-                style={styles.deckThumbnail}
+              <Heart
+                size={28}
+                color={item.isLiked ? '#EF4444' : '#FFFFFF'}
+                fill={item.isLiked ? '#EF4444' : 'none'}
+                strokeWidth={2}
               />
-              {/* Badge: 📹 index/15 */}
-              <View style={styles.deckBadge}>
-                <VideoIcon size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
-                <Text style={styles.deckBadgeText}>{`${currentIndex + 1}/15`}</Text>
-              </View>
-              {/* Mini Creator Avatar Badge */}
-              <View style={styles.deckAvatarBadge}>
-                <Image
-                  source={{ uri: nextReel?.user?.avatarUrl || item.user.avatarUrl }}
-                  style={styles.deckAvatarImg}
-                />
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Left: Creator Info, Caption, Music Row */}
-        <View style={styles.bottomCreatorContainer}>
-          <View style={styles.creatorRow}>
-            <TouchableOpacity
-              onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
-              activeOpacity={0.8}
-            >
-              <Image source={{ uri: item.user.avatarUrl }} style={styles.creatorAvatar} />
+              <Text style={styles.actionText}>
+                {item.likeCount > 999
+                  ? `${(item.likeCount / 1000).toFixed(1)}K`
+                  : item.likeCount}
+              </Text>
             </TouchableOpacity>
 
+            {/* 2. Comments / Grid Button -> Opens 3D Deck Carousel */}
             <TouchableOpacity
-              onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.creatorUsername}>{item.user.username}</Text>
-            </TouchableOpacity>
-
-            {/* Follow Button (Besides Brand Colors) */}
-            <TouchableOpacity
-              onPress={() => toggleFollow(index)}
+              style={styles.actionItem}
+              onPress={handleOpenDeckMode}
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={
-                  item.isFollowing
-                    ? ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.15)']
-                    : [colors.gradientStart, colors.gradientEnd]
-                }
+                colors={[colors.gradientStart, colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.followButtonGradient}
+                end={{ x: 1, y: 1 }}
+                style={styles.commentGridBox}
               >
-                {item.isFollowing ? (
-                  <View style={styles.followingRow}>
-                    <Check size={11} color="#FFFFFF" strokeWidth={3} style={{ marginRight: 3 }} />
-                    <Text style={styles.followButtonText}>Following</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.followButtonText}>Follow</Text>
-                )}
+                <LayoutGrid size={18} color="#FFFFFF" strokeWidth={2.2} />
               </LinearGradient>
+              <Text style={styles.actionText}>{item.commentCount}</Text>
+            </TouchableOpacity>
+
+            {/* 3. Share Paper Airplane */}
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={onOpenChat}
+              activeOpacity={0.7}
+            >
+              <Send
+                size={24}
+                color="#FFFFFF"
+                strokeWidth={2}
+                style={{ transform: [{ rotate: '-20deg' }] }}
+              />
+              <Text style={styles.actionText}>
+                {item.shareCount > 999
+                  ? `${(item.shareCount / 1000).toFixed(1)}K`
+                  : item.shareCount}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 4. Video Camera / Comment Button */}
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => setSelectedVideoForComments(item)}
+              activeOpacity={0.7}
+            >
+              <VideoIcon size={24} color="#FFFFFF" strokeWidth={2} />
+            </TouchableOpacity>
+
+            {/* 5. Stacked Video Preview Deck Card (Tapping triggers 3D Card Deck Mode!) */}
+            <TouchableOpacity
+              style={styles.nextPreviewDeck}
+              onPress={handleOpenDeckMode}
+              activeOpacity={0.85}
+            >
+              {/* Stack 3D Layer Underlay */}
+              <View style={styles.deckCardUnderlay} />
+              {/* Main Preview Card */}
+              <View style={styles.deckCardMain}>
+                <Image
+                  source={{ uri: nextReel?.thumbnailUrl || item.thumbnailUrl }}
+                  style={styles.deckThumbnail}
+                />
+                {/* Badge: 📹 index/15 */}
+                <View style={styles.deckBadge}>
+                  <VideoIcon size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+                  <Text style={styles.deckBadgeText}>{`${currentIndex + 1}/15`}</Text>
+                </View>
+                {/* Mini Creator Avatar Badge */}
+                <View style={styles.deckAvatarBadge}>
+                  <Image
+                    source={{ uri: nextReel?.user?.avatarUrl || item.user.avatarUrl }}
+                    style={styles.deckAvatarImg}
+                  />
+                </View>
+              </View>
             </TouchableOpacity>
           </View>
+        )}
 
-          {/* Caption */}
-          <Text style={styles.captionText} numberOfLines={2}>
-            {item.caption}
-          </Text>
+        {/* Bottom Left: Creator Info, Caption, Music Row (Hidden in deck mode) */}
+        {!isDeckMode && (
+          <View style={styles.bottomCreatorContainer}>
+            <View style={styles.creatorRow}>
+              <TouchableOpacity
+                onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
+                activeOpacity={0.8}
+              >
+                <Image source={{ uri: item.user.avatarUrl }} style={styles.creatorAvatar} />
+              </TouchableOpacity>
 
-          {/* Music Row */}
-          <View style={styles.musicRow}>
-            <Music size={12} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.musicText} numberOfLines={1}>
-              {item.musicTitle}
+              <TouchableOpacity
+                onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.creatorUsername}>{item.user.username}</Text>
+              </TouchableOpacity>
+
+              {/* Follow Button (Besides Brand Colors) */}
+              <TouchableOpacity
+                onPress={() => toggleFollow(index)}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={
+                    item.isFollowing
+                      ? ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.15)']
+                      : [colors.gradientStart, colors.gradientEnd]
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.followButtonGradient}
+                >
+                  {item.isFollowing ? (
+                    <View style={styles.followingRow}>
+                      <Check size={11} color="#FFFFFF" strokeWidth={3} style={{ marginRight: 3 }} />
+                      <Text style={styles.followButtonText}>Following</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.followButtonText}>Follow</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            {/* Caption */}
+            <Text style={styles.captionText} numberOfLines={2}>
+              {item.caption}
             </Text>
+
+            {/* Music Row */}
+            <View style={styles.musicRow}>
+              <Music size={12} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.musicText} numberOfLines={1}>
+                {item.musicTitle}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
       </View>
     );
   };
 
   // =========================================================================
-  // 2. RENDER 3D HORIZONTAL CARD DECK ITEM (Matching user's reference video)
+  // 2. RENDER 3D STACKED CARD DECK (Matching user's reference video 200%)
+  // Cards are physically stacked on top of one another ("oka danimida inkoti unnay")
+  // Swiping horizontally reveals them one-by-one from the stack.
   // =========================================================================
-  const renderDeckCardItem = ({ item, index }: { item: any; index: number }) => {
-    const isActive = index === deckActiveIndex;
+  const renderDeckCard = (item: any, index: number, diff: number) => {
+    const isActive = diff === 0;
+
+    let cardTransform: any[] = [];
+    let cardOpacity: any = 1;
+    let cardZIndex = 10;
+
+    if (isActive) {
+      cardZIndex = 40;
+      cardTransform = [
+        { translateX: deckPanX },
+        {
+          rotate: deckPanX.interpolate({
+            inputRange: [-300, 0, 300],
+            outputRange: ['-8deg', '0deg', '8deg'],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: deckPanX.interpolate({
+            inputRange: [-300, 0, 300],
+            outputRange: [0.96, 1, 0.96],
+            extrapolate: 'clamp',
+          }),
+        },
+      ];
+      cardOpacity = deckPanX.interpolate({
+        inputRange: [-320, -180, 0, 180, 320],
+        outputRange: [0.25, 0.95, 1, 0.95, 0.25],
+        extrapolate: 'clamp',
+      });
+    } else if (diff === 1) {
+      cardZIndex = 30;
+      cardTransform = [
+        {
+          translateX: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [0, 24],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [1, 0.94],
+            extrapolate: 'clamp',
+          }),
+        },
+      ];
+      cardOpacity = deckPanX.interpolate({
+        inputRange: [-250, 0],
+        outputRange: [1, 0.92],
+        extrapolate: 'clamp',
+      });
+    } else if (diff === 2) {
+      cardZIndex = 20;
+      cardTransform = [
+        {
+          translateX: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [24, 46],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [0.94, 0.88],
+            extrapolate: 'clamp',
+          }),
+        },
+      ];
+      cardOpacity = deckPanX.interpolate({
+        inputRange: [-250, 0],
+        outputRange: [0.92, 0.75],
+        extrapolate: 'clamp',
+      });
+    } else if (diff === 3) {
+      cardZIndex = 10;
+      cardTransform = [
+        {
+          translateX: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [46, 66],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: deckPanX.interpolate({
+            inputRange: [-250, 0],
+            outputRange: [0.88, 0.82],
+            extrapolate: 'clamp',
+          }),
+        },
+      ];
+      cardOpacity = deckPanX.interpolate({
+        inputRange: [-250, 0],
+        outputRange: [0.75, 0.52],
+        extrapolate: 'clamp',
+      });
+    } else if (diff === -1) {
+      cardZIndex = 25;
+      cardTransform = [
+        {
+          translateX: deckPanX.interpolate({
+            inputRange: [0, 250],
+            outputRange: [-26, 0],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: deckPanX.interpolate({
+            inputRange: [0, 250],
+            outputRange: [0.94, 1],
+            extrapolate: 'clamp',
+          }),
+        },
+      ];
+      cardOpacity = deckPanX.interpolate({
+        inputRange: [0, 250],
+        outputRange: [0.65, 1],
+        extrapolate: 'clamp',
+      });
+    }
 
     return (
-      <View style={{ width: ITEM_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        key={item.id}
+        style={[
+          styles.stackedDeckCardWrapper,
+          {
+            zIndex: cardZIndex,
+            opacity: cardOpacity,
+            transform: cardTransform,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[
             styles.floatingDeckCard,
             {
-              transform: [{ scale: isActive ? 1.0 : 0.88 }],
-              opacity: isActive ? 1.0 : 0.55,
-              borderColor: isActive ? 'rgba(224, 40, 125, 0.65)' : 'rgba(255, 255, 255, 0.15)',
+              borderColor: isActive
+                ? 'rgba(224, 40, 125, 0.75)'
+                : 'rgba(255, 255, 255, 0.16)',
               shadowColor: colors.primary,
             },
           ]}
           onPress={() => {
             if (isActive) {
               handleSelectReelFromDeck(index);
+            } else if (diff > 0) {
+              nextCard();
             } else {
-              scrollToDeckIndex(index);
+              prevCard();
             }
           }}
-          activeOpacity={0.92}
+          activeOpacity={isActive ? 0.95 : 0.85}
         >
           {/* Card Media Preview */}
           <Image
@@ -455,74 +652,104 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               source={{ uri: item.videoUrl }}
               style={StyleSheet.absoluteFillObject}
               resizeMode={ResizeMode.COVER}
-              shouldPlay={true}
+              shouldPlay={isDeckMode}
               isLooping
               isMuted={isMuted}
               useNativeControls={false}
             />
           )}
 
-          {/* Card Vignette */}
+          {/* Vignette */}
           <LinearGradient
-            colors={['rgba(0,0,0,0.65)', 'transparent', 'rgba(0,0,0,0.85)']}
+            colors={['rgba(0,0,0,0.65)', 'transparent', 'rgba(0,0,0,0.88)']}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
 
-          {/* Card Top Bar (← @currentReelCreator + Mute Button) */}
-          <View style={styles.deckCardTopBar}>
-            <TouchableOpacity
-              style={styles.deckCardUserRow}
-              onPress={() => setIsDeckMode(false)}
-              activeOpacity={0.8}
-            >
-              <ArrowLeft size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.deckCardUsername}>
-                @{videos[currentIndex]?.user?.username || 'maya.films'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.deckCardMuteBtn}
-              onPress={() => setIsMuted(!isMuted)}
-              activeOpacity={0.8}
-            >
-              {isMuted ? (
-                <VolumeX size={15} color="#FFFFFF" />
-              ) : (
-                <Volume2 size={15} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Card Bottom Meta (Avatar, Caption, Likes) */}
-          <View style={styles.deckCardBottomMeta}>
-            <View style={styles.deckCardCreatorRow}>
-              <Image source={{ uri: item.user.avatarUrl }} style={styles.deckCardAvatar} />
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.deckCardCreatorName}>{item.user.username}</Text>
-                  <Text style={styles.deckCardTimeAgo}>• {item.timeAgo || '5d'}</Text>
-                </View>
-                <Text style={styles.deckCardCaption} numberOfLines={2}>
-                  {item.caption}
-                </Text>
-              </View>
+          {/* Top Bar on Active Card (← @creator + Mute) */}
+          {isActive && (
+            <View style={styles.deckCardTopBar}>
               <TouchableOpacity
-                onPress={() => toggleLike(index)}
-                style={styles.deckCardLikeBtn}
+                style={styles.deckCardUserRow}
+                onPress={() => setIsDeckMode(false)}
+                activeOpacity={0.8}
               >
-                <Heart
-                  size={22}
-                  color={item.isLiked ? '#EF4444' : '#FFFFFF'}
-                  fill={item.isLiked ? '#EF4444' : 'none'}
-                />
+                <ArrowLeft size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.deckCardUsername}>
+                  @{videos[currentIndex]?.user?.username || 'maya.films'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deckCardMuteBtn}
+                onPress={() => setIsMuted(!isMuted)}
+                activeOpacity={0.8}
+              >
+                {isMuted ? (
+                  <VolumeX size={15} color="#FFFFFF" />
+                ) : (
+                  <Volume2 size={15} color="#FFFFFF" />
+                )}
               </TouchableOpacity>
             </View>
-          </View>
+          )}
+
+          {/* Bottom Meta on Active Card */}
+          {isActive && (
+            <View style={styles.deckCardBottomMeta}>
+              <View style={styles.deckCardCreatorRow}>
+                <Image source={{ uri: item.user.avatarUrl }} style={styles.deckCardAvatar} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.deckCardCreatorName}>{item.user.username}</Text>
+                    <Text style={styles.deckCardTimeAgo}>• {item.timeAgo || '5d'}</Text>
+                  </View>
+                  <Text style={styles.deckCardCaption} numberOfLines={2}>
+                    {item.caption}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => toggleLike(index)}
+                  style={styles.deckCardLikeBtn}
+                >
+                  <Heart
+                    size={22}
+                    color={item.isLiked ? '#EF4444' : '#FFFFFF'}
+                    fill={item.isLiked ? '#EF4444' : 'none'}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
+  };
+
+  // Render cards in order from back-to-front so DOM layering is 100% physically stacked
+  const renderStackedCards = () => {
+    const list: { item: any; index: number; diff: number }[] = [];
+
+    // Right peeking cards (diff > 0): render from furthest (diff = 3) to closest (diff = 1)
+    if (deckActiveIndex + 3 < videos.length) {
+      list.push({ item: videos[deckActiveIndex + 3], index: deckActiveIndex + 3, diff: 3 });
+    }
+    if (deckActiveIndex + 2 < videos.length) {
+      list.push({ item: videos[deckActiveIndex + 2], index: deckActiveIndex + 2, diff: 2 });
+    }
+    if (deckActiveIndex + 1 < videos.length) {
+      list.push({ item: videos[deckActiveIndex + 1], index: deckActiveIndex + 1, diff: 1 });
+    }
+    // Left peeking card (diff = -1)
+    if (deckActiveIndex - 1 >= 0) {
+      list.push({ item: videos[deckActiveIndex - 1], index: deckActiveIndex - 1, diff: -1 });
+    }
+    // Top active card (diff = 0)
+    if (deckActiveIndex < videos.length) {
+      list.push({ item: videos[deckActiveIndex], index: deckActiveIndex, diff: 0 });
+    }
+
+    return list.map(({ item, index, diff }) => renderDeckCard(item, index, diff));
   };
 
   return (
@@ -538,83 +765,85 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
       }}
     >
-      {/* 1. TOP HEADER BAR */}
-      <View style={styles.topHeaderBar}>
-        {/* Left: Transparent Besides Logo */}
-        <TouchableOpacity style={styles.logoCircleWrapper} activeOpacity={0.8}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={styles.headerLogoImg}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-
-        {/* Center: Following | For You Switcher */}
-        <View style={styles.segmentedSwitcher}>
-          <TouchableOpacity
-            style={[
-              styles.switchTab,
-              activeTab === 'following' && styles.switchTabActive,
-            ]}
-            onPress={() => setActiveTab('following')}
-            activeOpacity={0.8}
-          >
-            {activeTab === 'following' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.activeTabGradient}
-              >
-                <Text style={styles.activeTabText}>Following</Text>
-              </LinearGradient>
-            ) : (
-              <Text style={styles.inactiveTabText}>Following</Text>
-            )}
+      {/* 1. TOP HEADER BAR (Hidden in deck mode so background reel is clean) */}
+      {!isDeckMode && (
+        <View style={styles.topHeaderBar}>
+          {/* Left: Transparent Besides Logo */}
+          <TouchableOpacity style={styles.logoCircleWrapper} activeOpacity={0.8}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.headerLogoImg}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.switchTab,
-              activeTab === 'for_you' && styles.switchTabActive,
-            ]}
-            onPress={() => setActiveTab('for_you')}
-            activeOpacity={0.8}
-          >
-            {activeTab === 'for_you' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.activeTabGradient}
-              >
-                <Text style={styles.activeTabText}>For You</Text>
-              </LinearGradient>
-            ) : (
-              <Text style={styles.inactiveTabText}>For You</Text>
-            )}
-          </TouchableOpacity>
+          {/* Center: Following | For You Switcher */}
+          <View style={styles.segmentedSwitcher}>
+            <TouchableOpacity
+              style={[
+                styles.switchTab,
+                activeTab === 'following' && styles.switchTabActive,
+              ]}
+              onPress={() => setActiveTab('following')}
+              activeOpacity={0.8}
+            >
+              {activeTab === 'following' ? (
+                <LinearGradient
+                  colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeTabGradient}
+                >
+                  <Text style={styles.activeTabText}>Following</Text>
+                </LinearGradient>
+              ) : (
+                <Text style={styles.inactiveTabText}>Following</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.switchTab,
+                activeTab === 'for_you' && styles.switchTabActive,
+              ]}
+              onPress={() => setActiveTab('for_you')}
+              activeOpacity={0.8}
+            >
+              {activeTab === 'for_you' ? (
+                <LinearGradient
+                  colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeTabGradient}
+                >
+                  <Text style={styles.activeTabText}>For You</Text>
+                </LinearGradient>
+              ) : (
+                <Text style={styles.inactiveTabText}>For You</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Right: Search & Bell Buttons */}
+          <View style={styles.rightTopButtons}>
+            <TouchableOpacity
+              style={styles.topCircleIconBtn}
+              onPress={onOpenSearch}
+              activeOpacity={0.8}
+            >
+              <Search size={17} color="#FFFFFF" strokeWidth={2.4} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.topCircleIconBtn, { marginLeft: 8 }]}
+              onPress={onOpenNotifications || onOpenChat}
+              activeOpacity={0.8}
+            >
+              <Bell size={17} color="#FFFFFF" strokeWidth={2.2} />
+            </TouchableOpacity>
+          </View>
         </View>
-
-        {/* Right: Search & Bell Buttons */}
-        <View style={styles.rightTopButtons}>
-          <TouchableOpacity
-            style={styles.topCircleIconBtn}
-            onPress={onOpenSearch}
-            activeOpacity={0.8}
-          >
-            <Search size={17} color="#FFFFFF" strokeWidth={2.4} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.topCircleIconBtn, { marginLeft: 8 }]}
-            onPress={onOpenNotifications || onOpenChat}
-            activeOpacity={0.8}
-          >
-            <Bell size={17} color="#FFFFFF" strokeWidth={2.2} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      )}
 
       {/* 2. FULL-SCREEN VERTICAL REEL FEED (Always mounted, paused when in deck mode) */}
       <FlatList
@@ -635,41 +864,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         style={styles.flatList}
       />
 
-      {/* 3. 3D HORIZONTAL CARD DECK CAROUSEL OVERLAY (Overlay on paused background reel) */}
+      {/* 3. 3D STACKED CARD DECK OVERLAY (Cards physically stacked on top of each other) */}
       {isDeckMode && (
         <View style={styles.deckModeOverlay}>
           {/* Semi-transparent Dimmer showing the stopped background reel */}
           <View style={styles.deckBackdropDimmer} />
 
-          {/* Continuous Horizontal Swiping Carousel */}
+          {/* Interactive Stacked Cards Area */}
           <View style={styles.deckCarouselWrapper} {...panResponder.panHandlers}>
-            <FlatList
-              ref={deckListRef}
-              data={videos}
-              renderItem={renderDeckCardItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={ITEM_WIDTH}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              contentContainerStyle={{
-                paddingHorizontal: Math.max(16, (containerWidth - ITEM_WIDTH) / 2),
-                alignItems: 'center',
-                paddingVertical: 10,
-              }}
-              onMomentumScrollEnd={(e) => {
-                const x = e.nativeEvent.contentOffset.x;
-                const idx = Math.round(x / ITEM_WIDTH);
-                const safeIdx = Math.max(0, Math.min(idx, videos.length - 1));
-                setDeckActiveIndex(safeIdx);
-              }}
-              getItemLayout={(_, index) => ({
-                length: ITEM_WIDTH,
-                offset: ITEM_WIDTH * index,
-                index,
-              })}
-            />
+            <View style={styles.stackedDeckContainer}>
+              {renderStackedCards()}
+            </View>
           </View>
 
           {/* Bottom Deck Indicator Pill: "📹 1/15 • Tap the Reel to resume • 0:03" */}
@@ -992,6 +1197,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stackedDeckContainer: {
+    width: CARD_WIDTH + 80,
+    height: CARD_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  stackedDeckCardWrapper: {
+    position: 'absolute',
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   floatingDeckCard: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
@@ -1079,20 +1298,6 @@ const styles = StyleSheet.create({
   deckCardLikeBtn: {
     marginLeft: 8,
     padding: 6,
-  },
-
-  deckArrowBtn: {
-    position: 'absolute',
-    top: '48%',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 200,
   },
   deckResumeIndicator: {
     position: 'absolute',

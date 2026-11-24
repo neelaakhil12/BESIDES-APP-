@@ -175,8 +175,8 @@ const MainNavigator: React.FC = () => {
             />
           )}
 
-          {/* Tab 2: Dedicated Reels Tab (Full-screen vertical video reels) */}
-          {activeTab === 'reels' && (
+          {/* Dedicated Reels Screen (if activated) */}
+          {(activeTab as string) === 'reels' && (
             <ReelsScreen
               onOpenChat={() => setActiveTab('chat')}
               onOpenProfile={(id) => {

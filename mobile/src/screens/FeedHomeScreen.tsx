@@ -95,7 +95,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
         <View style={styles.brandTitleContainer}>
           <Image
             source={require('../../assets/logo.png')}
-            style={styles.brandLogo}
+            style={styles.brandLogo as any}
             resizeMode="contain"
           />
           <Text style={styles.brandTitleText}>Besides</Text>
@@ -135,7 +135,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
                 <View style={styles.yourStoryWrapper}>
                   <Image
                     source={{ uri: user?.profile?.avatarUrl || item.avatarUrl }}
-                    style={styles.storyAvatar}
+                    style={styles.storyAvatar as any}
                   />
                   <View style={styles.yourStoryPlusBadge}>
                     <Plus size={11} color="#FFFFFF" strokeWidth={3.5} />
@@ -149,7 +149,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
                   style={styles.storyGradientRing}
                 >
                   <View style={styles.storyAvatarInner}>
-                    <Image source={{ uri: item.avatarUrl }} style={styles.storyAvatar} />
+                    <Image source={{ uri: item.avatarUrl }} style={styles.storyAvatar as any} />
                   </View>
                 </LinearGradient>
               )}
@@ -200,7 +200,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
             <View style={styles.bannerLogoContainer}>
               <Image
                 source={require('../../assets/logo.png')}
-                style={styles.banner3DLogo}
+                style={styles.banner3DLogo as any}
                 resizeMode="contain"
               />
             </View>
@@ -346,7 +346,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
 
                   {/* Avatar with subtle glow */}
                   <View style={styles.suggestedAvatarRing}>
-                    <Image source={{ uri: sug.avatarUrl }} style={styles.suggestedAvatar} />
+                    <Image source={{ uri: sug.avatarUrl }} style={styles.suggestedAvatar as any} />
                   </View>
 
                   <Text style={styles.suggestedUsername} numberOfLines={1}>
@@ -413,7 +413,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
                 onPress={() => onOpenProfile && onOpenProfile(post.user.username)}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: post.user.avatarUrl }} style={styles.postAvatar} />
+                <Image source={{ uri: post.user.avatarUrl }} style={styles.postAvatar as any} />
                 <View>
                   <View style={styles.postAuthorNameRow}>
                     <Text style={styles.postAuthorName}>{post.user.username}</Text>
@@ -437,7 +437,7 @@ export const FeedHomeScreen: React.FC<FeedHomeScreenProps> = ({
 
             {/* Video/Image Container with Center Play Button */}
             <View style={styles.postMediaContainer}>
-              <Image source={{ uri: post.imageUrl }} style={styles.postImage} resizeMode="cover" />
+              <Image source={{ uri: post.imageUrl }} style={styles.postImage as any} resizeMode="cover" />
 
               {/* Glossy Center Play Button */}
               <TouchableOpacity
