@@ -23,6 +23,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { CreateVideoScreen } from './src/screens/CreateVideoScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { SearchExploreScreen } from './src/screens/SearchExploreScreen';
 
 type AppScreen =
   | 'splash'
@@ -35,7 +36,8 @@ type AppScreen =
   | 'view_profile'
   | 'create_video'
   | 'maps'
-  | 'notifications';
+  | 'notifications'
+  | 'search';
 
 const MainNavigator: React.FC = () => {
   const { user, logout } = useAuth();
@@ -193,7 +195,42 @@ const MainNavigator: React.FC = () => {
     );
   }
 
-  // 10. Main 5-Tab Application Container (Home, Reels, Chat, Explore, Profile)
+  // 11. Search / Explore Moments Screen ("People, moments, interests")
+  if (currentScreen === 'search') {
+    return (
+      <MobileFrame>
+        <View style={styles.appContainer}>
+          <View style={styles.contentArea}>
+            <SearchExploreScreen
+              onBack={() => setCurrentScreen('main')}
+              onSelectMoment={(moment) => {
+                setActiveTab('home');
+                setCurrentScreen('main');
+              }}
+              onOpenProfile={(id) => {
+                setSelectedProfileId(id);
+                setCurrentScreen('view_profile');
+              }}
+            />
+          </View>
+          <BottomNavBar
+            currentTab={activeTab}
+            onSelectTab={(tab) => {
+              if (tab === 'create') {
+                setCurrentScreen('create_video');
+              } else {
+                setActiveTab(tab);
+                setCurrentScreen('main');
+              }
+            }}
+            userAvatarUrl={user?.profile?.avatarUrl}
+          />
+        </View>
+      </MobileFrame>
+    );
+  }
+
+  // 12. Main 5-Tab Application Container (Home, Reels, Chat, Explore, Profile)
   return (
     <MobileFrame>
       <View style={styles.appContainer}>
@@ -202,7 +239,7 @@ const MainNavigator: React.FC = () => {
           {/* Tab 1: Immersive Video Feed Home Page matching screenshot */}
           {activeTab === 'home' && (
             <HomeScreen
-              onOpenSearch={() => setActiveTab('explore')}
+              onOpenSearch={() => setCurrentScreen('search')}
               onOpenNotifications={() => setCurrentScreen('notifications')}
               onOpenChat={() => setActiveTab('chat')}
               onOpenProfile={(id) => {
@@ -243,6 +280,7 @@ const MainNavigator: React.FC = () => {
               }}
               onOpenChat={() => setActiveTab('chat')}
               onOpenNotifications={() => setCurrentScreen('notifications')}
+              onOpenSearch={() => setCurrentScreen('search')}
             />
           )}
 

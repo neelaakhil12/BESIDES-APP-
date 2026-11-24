@@ -37,6 +37,7 @@ interface ExploreScreenProps {
   onOpenProfile?: (userId: string) => void;
   onOpenChat?: () => void;
   onOpenNotifications?: () => void;
+  onOpenSearch?: () => void;
   onSelectVideo?: (video: any) => void;
 }
 
@@ -44,6 +45,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
   onOpenProfile,
   onOpenChat,
   onOpenNotifications,
+  onOpenSearch,
 }) => {
   const { colors } = useTheme();
 
@@ -166,7 +168,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={styles.headerIconButton}
-            onPress={() => setShowSearchBar(!showSearchBar)}
+            onPress={() => (onOpenSearch ? onOpenSearch() : setShowSearchBar(!showSearchBar))}
             activeOpacity={0.7}
           >
             <Search size={18} color="#FFFFFF" strokeWidth={2.2} />
