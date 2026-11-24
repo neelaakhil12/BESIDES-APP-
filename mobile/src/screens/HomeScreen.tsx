@@ -27,6 +27,8 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Play,
+  Pause,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { CommentsModal } from './CommentsModal';
@@ -114,6 +116,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Mute state
   const [isMuted, setIsMuted] = useState(true);
 
+  // Play/pause states
+  const [isPaused, setIsPaused] = useState(false);
+  const [isDeckPaused, setIsDeckPaused] = useState(false);
+
+  const togglePlayPause = () => {
+    setIsPaused((prev) => !prev);
+  };
+
   // Comments modal
   const [selectedVideoForComments, setSelectedVideoForComments] = useState<any | null>(null);
 
@@ -134,6 +144,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setDeckActiveIndex(currentIndex);
     deckActiveIndexRef.current = currentIndex;
     deckPanX.setValue(0);
+    setIsDeckPaused(false);
     setIsDeckMode(true);
   };
 
@@ -218,6 +229,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Close Deck Mode and resume full-screen playback of the selected card
   const handleSelectReelFromDeck = (index: number) => {
     setCurrentIndex(index);
+    setIsPaused(false);
     setIsDeckMode(false);
     setTimeout(() => {
       flatListRef.current?.scrollToIndex({
@@ -288,7 +300,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           source={{ uri: item.videoUrl }}
           style={StyleSheet.absoluteFillObject}
           resizeMode={ResizeMode.COVER}
-          shouldPlay={isFocused}
+          shouldPlay={isFocused && !isPaused}
           isLooping
           isMuted={isMuted}
           useNativeControls={false}
@@ -300,6 +312,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
+
+        {/* Tap video to Pause / Resume (Full-screen Reel) */}
+        {!isDeckMode && (
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={togglePlayPause}
+          >
+            {/* Center Frosted Play Badge when paused */}
+            {isFocused && isPaused && (
+              <View style={styles.centerPlayPauseOverlay} pointerEvents="none">
+                <View style={styles.centerPlayPauseCircle}>
+                  <Play size={34} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 4 }} />
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Floating Mute Button (Hidden in deck mode so background is clean) */}
         {!isDeckMode && (
@@ -652,7 +682,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               source={{ uri: item.videoUrl }}
               style={StyleSheet.absoluteFillObject}
               resizeMode={ResizeMode.COVER}
-              shouldPlay={isDeckMode}
+              shouldPlay={isDeckMode && !isDeckPaused}
               isLooping
               isMuted={isMuted}
               useNativeControls={false}
@@ -666,7 +696,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             pointerEvents="none"
           />
 
-          {/* Top Bar on Active Card (← @creator + Mute) */}
+          {/* Center Play Indicator on Active Card when paused */}
+          {isActive && isDeckPaused && (
+            <View style={styles.centerPlayPauseOverlay} pointerEvents="none">
+              <View style={[styles.centerPlayPauseCircle, { width: 54, height: 54, borderRadius: 27 }]}>
+                <Play size={24} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
+              </View>
+            </View>
+          )}
+
+          {/* Top Bar on Active Card (← @creator + Play/Pause + Mute) */}
           {isActive && (
             <View style={styles.deckCardTopBar}>
               <TouchableOpacity
@@ -680,17 +719,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.deckCardMuteBtn}
-                onPress={() => setIsMuted(!isMuted)}
-                activeOpacity={0.8}
-              >
-                {isMuted ? (
-                  <VolumeX size={15} color="#FFFFFF" />
-                ) : (
-                  <Volume2 size={15} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {/* Play/Pause Button on Active Card */}
+                <TouchableOpacity
+                  style={[styles.deckCardMuteBtn, { marginRight: 6 }]}
+                  onPress={() => setIsDeckPaused(!isDeckPaused)}
+                  activeOpacity={0.8}
+                >
+                  {isDeckPaused ? (
+                    <Play size={13} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                  ) : (
+                    <Pause size={13} color="#FFFFFF" fill="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deckCardMuteBtn}
+                  onPress={() => setIsMuted(!isMuted)}
+                  activeOpacity={0.8}
+                >
+                  {isMuted ? (
+                    <VolumeX size={15} color="#FFFFFF" />
+                  ) : (
+                    <Volume2 size={15} color="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -856,6 +910,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onMomentumScrollEnd={(e) => {
           const h = containerHeight > 0 ? containerHeight : 660;
           const index = Math.round(e.nativeEvent.contentOffset.y / h);
+          if (index !== currentIndex) {
+            setIsPaused(false);
+          }
           setCurrentIndex(index);
         }}
         snapToInterval={containerHeight > 0 ? containerHeight : 660}
@@ -1325,5 +1382,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: -0.1,
+  },
+  centerPlayPauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 15,
+  },
+  centerPlayPauseCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 8,
   },
 });
