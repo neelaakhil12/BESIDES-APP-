@@ -31,10 +31,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { CommentsModal } from './CommentsModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
-const CARD_WIDTH = 260;
+const CARD_WIDTH = 250;
 const CARD_SPACING = 14;
 const ITEM_WIDTH = CARD_WIDTH + CARD_SPACING;
-const CARD_HEIGHT = 440;
+const CARD_HEIGHT = 380;
 
 interface HomeScreenProps {
   onOpenSearch?: () => void;
@@ -469,7 +469,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             pointerEvents="none"
           />
 
-          {/* Card Top Bar (← @username + Mute Button) */}
+          {/* Card Top Bar (← @currentReelCreator + Mute Button) */}
           <View style={styles.deckCardTopBar}>
             <TouchableOpacity
               style={styles.deckCardUserRow}
@@ -477,7 +477,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               activeOpacity={0.8}
             >
               <ArrowLeft size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.deckCardUsername}>@{item.user.username}</Text>
+              <Text style={styles.deckCardUsername}>
+                @{videos[currentIndex]?.user?.username || 'maya.films'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -614,54 +616,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </View>
 
-      {/* 2. FULL-SCREEN VERTICAL REEL FEED */}
-      {!isDeckMode && (
-        <FlatList
-          ref={flatListRef}
-          data={videos}
-          renderItem={renderVideoItem}
-          keyExtractor={(item) => item.id}
-          pagingEnabled
-          showsVerticalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            const h = containerHeight > 0 ? containerHeight : 660;
-            const index = Math.round(e.nativeEvent.contentOffset.y / h);
-            setCurrentIndex(index);
-          }}
-          snapToInterval={containerHeight > 0 ? containerHeight : 660}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          style={styles.flatList}
-        />
-      )}
+      {/* 2. FULL-SCREEN VERTICAL REEL FEED (Always mounted, paused when in deck mode) */}
+      <FlatList
+        ref={flatListRef}
+        data={videos}
+        renderItem={renderVideoItem}
+        keyExtractor={(item) => item.id}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => {
+          const h = containerHeight > 0 ? containerHeight : 660;
+          const index = Math.round(e.nativeEvent.contentOffset.y / h);
+          setCurrentIndex(index);
+        }}
+        snapToInterval={containerHeight > 0 ? containerHeight : 660}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        style={styles.flatList}
+      />
 
-      {/* 3. 3D HORIZONTAL CARD DECK CAROUSEL MODE (Activated on Preview/Grid tap) */}
+      {/* 3. 3D HORIZONTAL CARD DECK CAROUSEL OVERLAY (Overlay on paused background reel) */}
       {isDeckMode && (
         <View style={styles.deckModeOverlay}>
-          {/* Dark Backdrop */}
+          {/* Semi-transparent Dimmer showing the stopped background reel */}
           <View style={styles.deckBackdropDimmer} />
-
-          {/* Left Arrow Button */}
-          {deckActiveIndex > 0 && (
-            <TouchableOpacity
-              style={[styles.deckArrowBtn, { left: 8 }]}
-              onPress={() => scrollToDeckIndex(deckActiveIndex - 1)}
-              activeOpacity={0.7}
-            >
-              <ChevronLeft size={22} color="#FFFFFF" strokeWidth={2.5} />
-            </TouchableOpacity>
-          )}
-
-          {/* Right Arrow Button */}
-          {deckActiveIndex < videos.length - 1 && (
-            <TouchableOpacity
-              style={[styles.deckArrowBtn, { right: 8 }]}
-              onPress={() => scrollToDeckIndex(deckActiveIndex + 1)}
-              activeOpacity={0.7}
-            >
-              <ChevronRight size={22} color="#FFFFFF" strokeWidth={2.5} />
-            </TouchableOpacity>
-          )}
 
           {/* Continuous Horizontal Swiping Carousel */}
           <View style={styles.deckCarouselWrapper} {...panResponder.panHandlers}>
@@ -694,18 +672,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             />
           </View>
 
-          {/* Bottom Deck Indicator: "1/15 • Tap the Reel to resume • 0:03" */}
+          {/* Bottom Deck Indicator Pill: "📹 1/15 • Tap the Reel to resume • 0:03" */}
           <TouchableOpacity
             style={styles.deckResumeIndicator}
             onPress={() => handleSelectReelFromDeck(deckActiveIndex)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Text style={styles.deckResumeText}>
-              <Text style={{ fontWeight: '900', color: '#FFFFFF' }}>
-                {deckActiveIndex + 1}/15
+            <View style={styles.deckIndicatorRow}>
+              <VideoIcon size={12} color="#FFFFFF" style={{ marginRight: 5 }} />
+              <Text style={styles.deckResumeText}>
+                <Text style={{ fontWeight: '900', color: '#FFFFFF' }}>
+                  {deckActiveIndex + 1}/15
+                </Text>
+                {'  •  Tap the Reel to resume  •  0:03'}
               </Text>
-              {'  •  Tap the Reel to resume  •  0:03'}
-            </Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -995,13 +976,15 @@ const styles = StyleSheet.create({
   // =========================================================================
   deckModeOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     zIndex: 150,
     justifyContent: 'center',
+    paddingTop: 30,
+    paddingBottom: 70,
   },
   deckBackdropDimmer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 8, 20, 0.94)',
+    backgroundColor: 'rgba(0, 0, 0, 0.58)',
   },
   deckCarouselWrapper: {
     width: '100%',
@@ -1120,13 +1103,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(224, 40, 125, 0.4)',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 8,
     zIndex: 100,
+  },
+  deckIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   deckResumeText: {
     color: '#94A3B8',
