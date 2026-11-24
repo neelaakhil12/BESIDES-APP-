@@ -30,9 +30,8 @@ import { useTheme } from '../theme/ThemeContext';
 import { CommentsModal } from './CommentsModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.76, 300);
-const CARD_HEIGHT = 480;
+const CARD_WIDTH = 270;
+const CARD_HEIGHT = 440;
 
 interface HomeScreenProps {
   onOpenSearch?: () => void;
@@ -602,60 +601,159 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* 3. 3D HORIZONTAL CARD DECK CAROUSEL MODE (Activated on Preview/Grid tap) */}
       {isDeckMode && (
         <View style={styles.deckModeOverlay}>
-          {/* Blurred / Dark Backdrop */}
+          {/* Dark Backdrop */}
           <View style={styles.deckBackdropDimmer} />
 
-          {/* Left / Right Quick Navigation Buttons */}
-          <TouchableOpacity
-            style={[styles.deckArrowBtn, { left: 10 }]}
-            onPress={() => {
-              if (deckActiveIndex > 0) {
-                const prev = deckActiveIndex - 1;
-                setDeckActiveIndex(prev);
-                deckListRef.current?.scrollToIndex({ index: prev, animated: true });
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+          {/* Left Arrow Button */}
+          {deckActiveIndex > 0 && (
+            <TouchableOpacity
+              style={[styles.deckArrowBtn, { left: 8 }]}
+              onPress={() => setDeckActiveIndex((prev) => Math.max(0, prev - 1))}
+              activeOpacity={0.7}
+            >
+              <ChevronLeft size={22} color="#FFFFFF" strokeWidth={2.5} />
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity
-            style={[styles.deckArrowBtn, { right: 10 }]}
-            onPress={() => {
-              if (deckActiveIndex < videos.length - 1) {
-                const next = deckActiveIndex + 1;
-                setDeckActiveIndex(next);
-                deckListRef.current?.scrollToIndex({ index: next, animated: true });
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <ChevronRight size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+          {/* Right Arrow Button */}
+          {deckActiveIndex < videos.length - 1 && (
+            <TouchableOpacity
+              style={[styles.deckArrowBtn, { right: 8 }]}
+              onPress={() => setDeckActiveIndex((prev) => Math.min(videos.length - 1, prev + 1))}
+              activeOpacity={0.7}
+            >
+              <ChevronRight size={22} color="#FFFFFF" strokeWidth={2.5} />
+            </TouchableOpacity>
+          )}
 
-          {/* Horizontal Swiping Card Deck */}
-          <FlatList
-            ref={deckListRef}
-            data={videos}
-            renderItem={renderDeckCardItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 16}
-            snapToAlignment="center"
-            decelerationRate="fast"
-            contentContainerStyle={styles.deckListContent}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 16));
-              setDeckActiveIndex(Math.max(0, Math.min(idx, videos.length - 1)));
-            }}
-            getItemLayout={(_, index) => ({
-              length: CARD_WIDTH + 16,
-              offset: (CARD_WIDTH + 16) * index,
-              index,
-            })}
-          />
+          {/* 3D Cards Centered Stage */}
+          <View style={styles.deckStageContainer}>
+            {/* Left Peeking Sibling Card */}
+            {deckActiveIndex > 0 ? (
+              <TouchableOpacity
+                style={styles.sideDeckCardLeft}
+                onPress={() => setDeckActiveIndex((prev) => Math.max(0, prev - 1))}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: videos[deckActiveIndex - 1]?.thumbnailUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+                <View style={styles.sideCardDimmer} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.sideCardPlaceholder} />
+            )}
+
+            {/* Active Center 3D Card */}
+            {videos[deckActiveIndex] && (
+              <TouchableOpacity
+                style={styles.floatingCenterDeckCard}
+                onPress={() => handleSelectReelFromDeck(deckActiveIndex)}
+                activeOpacity={0.92}
+              >
+                <Image
+                  source={{ uri: videos[deckActiveIndex].thumbnailUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+
+                <Video
+                  source={{ uri: videos[deckActiveIndex].videoUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={true}
+                  isLooping
+                  isMuted={isMuted}
+                  useNativeControls={false}
+                />
+
+                <LinearGradient
+                  colors={['rgba(0,0,0,0.65)', 'transparent', 'rgba(0,0,0,0.85)']}
+                  style={StyleSheet.absoluteFillObject}
+                  pointerEvents="none"
+                />
+
+                {/* Card Top: ← @username and Mute Toggle */}
+                <View style={styles.deckCardTopBar}>
+                  <TouchableOpacity
+                    style={styles.deckCardUserRow}
+                    onPress={() => setIsDeckMode(false)}
+                    activeOpacity={0.8}
+                  >
+                    <ArrowLeft size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.deckCardUsername}>
+                      @{videos[deckActiveIndex].user.username}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deckCardMuteBtn}
+                    onPress={() => setIsMuted(!isMuted)}
+                    activeOpacity={0.8}
+                  >
+                    {isMuted ? (
+                      <VolumeX size={15} color="#FFFFFF" />
+                    ) : (
+                      <Volume2 size={15} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Card Bottom Meta */}
+                <View style={styles.deckCardBottomMeta}>
+                  <View style={styles.deckCardCreatorRow}>
+                    <Image
+                      source={{ uri: videos[deckActiveIndex].user.avatarUrl }}
+                      style={styles.deckCardAvatar}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.deckCardCreatorName}>
+                          {videos[deckActiveIndex].user.username}
+                        </Text>
+                        <Text style={styles.deckCardTimeAgo}>
+                          • {videos[deckActiveIndex].timeAgo || '5d'}
+                        </Text>
+                      </View>
+                      <Text style={styles.deckCardCaption} numberOfLines={2}>
+                        {videos[deckActiveIndex].caption}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => toggleLike(deckActiveIndex)}
+                      style={styles.deckCardLikeBtn}
+                    >
+                      <Heart
+                        size={22}
+                        color={videos[deckActiveIndex].isLiked ? '#EF4444' : '#FFFFFF'}
+                        fill={videos[deckActiveIndex].isLiked ? '#EF4444' : 'none'}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Right Peeking Sibling Card */}
+            {deckActiveIndex < videos.length - 1 ? (
+              <TouchableOpacity
+                style={styles.sideDeckCardRight}
+                onPress={() => setDeckActiveIndex((prev) => Math.min(videos.length - 1, prev + 1))}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: videos[deckActiveIndex + 1]?.thumbnailUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+                <View style={styles.sideCardDimmer} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.sideCardPlaceholder} />
+            )}
+          </View>
 
           {/* Bottom Deck Indicator: "1/15 • Tap the Reel to resume • 0:03" */}
           <TouchableOpacity
@@ -966,30 +1064,62 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(11, 8, 20, 0.94)',
   },
-  deckListContent: {
-    alignItems: 'center',
-    paddingHorizontal: (SCREEN_WIDTH - CARD_WIDTH) / 2,
-    paddingVertical: 40,
-  },
-  deckCardSlideWrapper: {
+  // 3D STAGE CONTAINER & CARDS
+  deckStageContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 8,
+    width: '100%',
+    paddingHorizontal: 6,
   },
-  floatingDeckCard: {
+  sideCardPlaceholder: {
+    width: 28,
+  },
+  sideDeckCardLeft: {
+    width: 38,
+    height: 380,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#1E1836',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginRight: -16,
+    opacity: 0.5,
+    transform: [{ scale: 0.88 }],
+    zIndex: 5,
+  },
+  sideDeckCardRight: {
+    width: 38,
+    height: 380,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#1E1836',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginLeft: -16,
+    opacity: 0.5,
+    transform: [{ scale: 0.88 }],
+    zIndex: 5,
+  },
+  sideCardDimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  floatingCenterDeckCard: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 24,
+    borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#161129',
     position: 'relative',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(224, 40, 125, 0.45)',
     shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
     shadowRadius: 18,
     elevation: 12,
+    zIndex: 10,
   },
   deckCardTopBar: {
     position: 'absolute',
@@ -1082,9 +1212,9 @@ const styles = StyleSheet.create({
   },
   deckResumeIndicator: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 84,
     alignSelf: 'center',
-    backgroundColor: 'rgba(22, 17, 41, 0.92)',
+    backgroundColor: 'rgba(22, 17, 41, 0.95)',
     borderWidth: 1,
     borderColor: 'rgba(224, 40, 125, 0.4)',
     borderRadius: 20,
@@ -1095,6 +1225,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 8,
+    zIndex: 100,
   },
   deckResumeText: {
     color: '#94A3B8',
