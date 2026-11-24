@@ -29,15 +29,16 @@ import {
   ChevronRight,
   Play,
   Pause,
+  Undo2,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { CommentsModal } from './CommentsModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
-const CARD_WIDTH = 250;
+const CARD_WIDTH = 295;
 const CARD_SPACING = 14;
 const ITEM_WIDTH = CARD_WIDTH + CARD_SPACING;
-const CARD_HEIGHT = 380;
+const CARD_HEIGHT = 480;
 
 interface HomeScreenProps {
   onOpenSearch?: () => void;
@@ -412,42 +413,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
               <VideoIcon size={24} color="#FFFFFF" strokeWidth={2} />
             </TouchableOpacity>
-
-            {/* 5. Stacked Video Preview Deck Card (Tapping triggers 3D Card Deck Mode!) */}
-            <TouchableOpacity
-              style={styles.nextPreviewDeck}
-              onPress={handleOpenDeckMode}
-              activeOpacity={0.85}
-            >
-              {/* Stack 3D Layer Underlay */}
-              <View style={styles.deckCardUnderlay} />
-              {/* Main Preview Card */}
-              <View style={styles.deckCardMain}>
-                <Image
-                  source={{ uri: nextReel?.thumbnailUrl || item.thumbnailUrl }}
-                  style={styles.deckThumbnail}
-                />
-                {/* Badge: 📹 index/15 */}
-                <View style={styles.deckBadge}>
-                  <VideoIcon size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
-                  <Text style={styles.deckBadgeText}>{`${currentIndex + 1}/15`}</Text>
-                </View>
-                {/* Mini Creator Avatar Badge */}
-                <View style={styles.deckAvatarBadge}>
-                  <Image
-                    source={{ uri: nextReel?.user?.avatarUrl || item.user.avatarUrl }}
-                    style={styles.deckAvatarImg}
-                  />
-                </View>
-              </View>
-            </TouchableOpacity>
           </View>
         )}
 
-        {/* Bottom Left: Creator Info, Caption, Music Row (Hidden in deck mode) */}
-        {!isDeckMode && (
-          <View style={styles.bottomCreatorContainer}>
-            <View style={styles.creatorRow}>
+        {/* 5. Stacked Video Preview Deck Card (Visible in both full-screen & deck mode; clicking toggles Deck Mode!) */}
+        <TouchableOpacity
+          style={[styles.nextPreviewDeck, isDeckMode && styles.nextPreviewDeckInMode]}
+          onPress={() => setIsDeckMode((prev) => !prev)}
+          activeOpacity={0.85}
+        >
+          {/* Stack 3D Layer Underlay */}
+          <View style={styles.deckCardUnderlay} />
+          {/* Main Preview Card */}
+          <View style={styles.deckCardMain}>
+            <Image
+              source={{ uri: nextReel?.thumbnailUrl || item.thumbnailUrl }}
+              style={styles.deckThumbnail}
+            />
+            {/* Badge: 📹 index/15 */}
+            <View style={styles.deckBadge}>
+              <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
+              <Text style={styles.deckBadgeText}>
+                {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
+              </Text>
+            </View>
+            {/* Mini Creator Avatar Badge */}
+            <View style={styles.deckAvatarBadge}>
+              <Image
+                source={{ uri: nextReel?.user?.avatarUrl || item.user.avatarUrl }}
+                style={styles.deckAvatarImg}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Bottom Left: Creator Info, Caption, Music Row */}
+        <View style={[styles.bottomCreatorContainer, isDeckMode && { opacity: 0.75 }]}>
+          <View style={styles.creatorRow}>
               <TouchableOpacity
                 onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
                 activeOpacity={0.8}
@@ -502,7 +504,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           </View>
-        )}
       </View>
     );
   };
@@ -549,14 +550,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {
           translateX: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [0, 24],
+            outputRange: [0, 20],
             extrapolate: 'clamp',
           }),
         },
         {
           scale: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [1, 0.94],
+            outputRange: [1, 0.95],
             extrapolate: 'clamp',
           }),
         },
@@ -572,14 +573,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {
           translateX: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [24, 46],
+            outputRange: [20, 38],
             extrapolate: 'clamp',
           }),
         },
         {
           scale: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [0.94, 0.88],
+            outputRange: [0.95, 0.90],
             extrapolate: 'clamp',
           }),
         },
@@ -595,14 +596,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {
           translateX: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [46, 66],
+            outputRange: [38, 54],
             extrapolate: 'clamp',
           }),
         },
         {
           scale: deckPanX.interpolate({
             inputRange: [-250, 0],
-            outputRange: [0.88, 0.82],
+            outputRange: [0.90, 0.85],
             extrapolate: 'clamp',
           }),
         },
@@ -618,14 +619,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {
           translateX: deckPanX.interpolate({
             inputRange: [0, 250],
-            outputRange: [-26, 0],
+            outputRange: [-22, 0],
             extrapolate: 'clamp',
           }),
         },
         {
           scale: deckPanX.interpolate({
             inputRange: [0, 250],
-            outputRange: [0.94, 1],
+            outputRange: [0.95, 1],
             extrapolate: 'clamp',
           }),
         },
@@ -661,7 +662,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ]}
           onPress={() => {
             if (isActive) {
-              handleSelectReelFromDeck(index);
+              setIsDeckPaused((prev) => !prev);
             } else if (diff > 0) {
               nextCard();
             } else {
@@ -699,13 +700,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Center Play Indicator on Active Card when paused */}
           {isActive && isDeckPaused && (
             <View style={styles.centerPlayPauseOverlay} pointerEvents="none">
-              <View style={[styles.centerPlayPauseCircle, { width: 54, height: 54, borderRadius: 27 }]}>
-                <Play size={24} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
+              <View style={styles.centerPlayPauseCircle}>
+                <Play size={34} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 4 }} />
               </View>
             </View>
           )}
 
-          {/* Top Bar on Active Card (← @creator + Play/Pause + Mute) */}
+          {/* Top Bar on Active Card (Avatar + ↩ @creator + LayoutGrid + Mute) */}
           {isActive && (
             <View style={styles.deckCardTopBar}>
               <TouchableOpacity
@@ -713,26 +714,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onPress={() => setIsDeckMode(false)}
                 activeOpacity={0.8}
               >
-                <ArrowLeft size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Image
+                  source={{ uri: videos[currentIndex]?.user?.avatarUrl || item.user.avatarUrl }}
+                  style={styles.deckCardTopAvatar}
+                />
+                <Undo2 size={13} color="#FFFFFF" style={{ marginRight: 5, marginLeft: 2 }} />
                 <Text style={styles.deckCardUsername}>
                   @{videos[currentIndex]?.user?.username || 'maya.films'}
                 </Text>
               </TouchableOpacity>
 
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {/* Play/Pause Button on Active Card */}
+                {/* Grid Icon Button */}
                 <TouchableOpacity
-                  style={[styles.deckCardMuteBtn, { marginRight: 6 }]}
-                  onPress={() => setIsDeckPaused(!isDeckPaused)}
+                  style={[styles.deckCardMuteBtn, { marginRight: 8 }]}
+                  onPress={() => setIsDeckMode(false)}
                   activeOpacity={0.8}
                 >
-                  {isDeckPaused ? (
-                    <Play size={13} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
-                  ) : (
-                    <Pause size={13} color="#FFFFFF" fill="#FFFFFF" />
-                  )}
+                  <LayoutGrid size={15} color="#FFFFFF" />
                 </TouchableOpacity>
 
+                {/* Volume Button */}
                 <TouchableOpacity
                   style={styles.deckCardMuteBtn}
                   onPress={() => setIsMuted(!isMuted)}
@@ -771,6 +773,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     color={item.isLiked ? '#EF4444' : '#FFFFFF'}
                     fill={item.isLiked ? '#EF4444' : 'none'}
                   />
+                  <Text style={styles.deckCardLikeCount}>
+                    {item.likeCount > 999 ? `${(item.likeCount / 1000).toFixed(1)}K` : item.likeCount}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -934,19 +939,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
 
-          {/* Bottom Deck Indicator Pill: "📹 1/15 • Tap the Reel to resume • 0:03" */}
+          {/* Bottom Deck Indicator Pill: "1/15 • ↩ Tap the Reel to resume • 0:01" */}
           <TouchableOpacity
             style={styles.deckResumeIndicator}
             onPress={() => handleSelectReelFromDeck(deckActiveIndex)}
             activeOpacity={0.85}
           >
             <View style={styles.deckIndicatorRow}>
-              <VideoIcon size={12} color="#FFFFFF" style={{ marginRight: 5 }} />
-              <Text style={styles.deckResumeText}>
-                <Text style={{ fontWeight: '900', color: '#FFFFFF' }}>
-                  {deckActiveIndex + 1}/15
-                </Text>
-                {'  •  Tap the Reel to resume  •  0:03'}
+              <Text style={{ fontWeight: '900', color: '#FFFFFF', fontSize: 12 }}>
+                {deckActiveIndex + 1}/15
+              </Text>
+              <Text style={styles.deckResumeDot}> • </Text>
+              <Undo2 size={12} color="#CBD5E1" style={{ marginRight: 4 }} />
+              <Text style={styles.deckResumeText} numberOfLines={1}>
+                Tap the Reel to resume • 0:01
               </Text>
             </View>
           </TouchableOpacity>
@@ -1107,10 +1113,15 @@ const styles = StyleSheet.create({
 
   // 3D STACKED PREVIEW DECK BUTTON
   nextPreviewDeck: {
+    position: 'absolute',
+    bottom: 84,
+    right: 14,
     width: 58,
     height: 74,
-    position: 'relative',
-    marginTop: 6,
+    zIndex: 100,
+  },
+  nextPreviewDeckInMode: {
+    zIndex: 200,
   },
   deckCardUnderlay: {
     position: 'absolute',
@@ -1240,22 +1251,22 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     zIndex: 150,
-    justifyContent: 'center',
-    paddingTop: 30,
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 46 : 38,
     paddingBottom: 70,
   },
   deckBackdropDimmer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.58)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   deckCarouselWrapper: {
     width: '100%',
-    height: CARD_HEIGHT + 30,
+    height: CARD_HEIGHT + 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stackedDeckContainer: {
-    width: CARD_WIDTH + 80,
+    width: CARD_WIDTH + 60,
     height: CARD_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1271,15 +1282,15 @@ const styles = StyleSheet.create({
   floatingDeckCard: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#161129',
     position: 'relative',
     borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 18,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 14,
   },
   deckCardTopBar: {
     position: 'absolute',
@@ -1295,15 +1306,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
+  deckCardTopAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
   deckCardUsername: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
   },
   deckCardMuteBtn: {
@@ -1355,31 +1374,48 @@ const styles = StyleSheet.create({
   deckCardLikeBtn: {
     marginLeft: 8,
     padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deckCardLikeCount: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   deckResumeIndicator: {
     position: 'absolute',
     bottom: 84,
-    alignSelf: 'center',
+    left: 14,
     backgroundColor: 'rgba(22, 17, 41, 0.95)',
     borderWidth: 1,
-    borderColor: 'rgba(224, 40, 125, 0.4)',
+    borderColor: 'rgba(224, 40, 125, 0.45)',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 8,
-    zIndex: 100,
+    zIndex: 170,
+    maxWidth: 240,
   },
   deckIndicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  deckResumeText: {
-    color: '#94A3B8',
+  deckResumeDot: {
+    color: '#CBD5E1',
     fontSize: 12,
+  },
+  deckResumeText: {
+    color: '#CBD5E1',
+    fontSize: 11.5,
     fontWeight: '600',
     letterSpacing: -0.1,
   },
