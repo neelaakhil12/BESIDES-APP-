@@ -1126,6 +1126,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 130,
     backgroundColor: 'rgba(11, 8, 20, 0.65)',
   },
   mapPrivacyCard: {
@@ -1133,9 +1134,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(224, 40, 125, 0.35)',
-    padding: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     alignItems: 'center',
-    maxWidth: 280,
+    maxWidth: 290,
     shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
@@ -1152,9 +1154,9 @@ const styles = StyleSheet.create({
   mapPrivacySubtitle: {
     color: '#94A3B8',
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 16,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   enableButtonSmall: {
     borderRadius: 16,
