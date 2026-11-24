@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Share,
+  Platform,
 } from 'react-native';
 import {
   Settings,
@@ -83,7 +84,52 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Voice Bio Audio playback state
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
-  const [voiceSound, setVoiceSound] = useState<Audio.Sound | null>(null);
+
+  // Speak greeting using Web Speech API (Free, zero API key required!)
+  const speakGreeting = (name: string) => {
+    const greetingText = `Hi, this is ${name}, nice to meet you.`;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(greetingText);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      utterance.lang = 'en-US';
+      utterance.onstart = () => setIsPlayingVoice(true);
+      utterance.onend = () => setIsPlayingVoice(false);
+      utterance.onerror = () => setIsPlayingVoice(false);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setIsPlayingVoice(true);
+      setTimeout(() => setIsPlayingVoice(false), 2600);
+    }
+  };
+
+  // Toggle Voice Bio audio preview
+  const togglePlayVoiceBio = () => {
+    if (isPlayingVoice) {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPlayingVoice(false);
+    } else {
+      speakGreeting(profileData.fullName || profileData.username);
+    }
+  };
+
+  // Automatically speak greeting when profile is opened
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      speakGreeting(profileData.fullName || profileData.username);
+    }, 450);
+
+    return () => {
+      clearTimeout(timer);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [profileData.fullName, profileData.username]);
 
   // Edit Profile Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -100,45 +146,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       console.log('Share error:', error);
     }
   };
-
-  // Toggle Voice Bio audio preview
-  const togglePlayVoiceBio = async () => {
-    const audioUrl = 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg';
-
-    try {
-      if (voiceSound) {
-        if (isPlayingVoice) {
-          await voiceSound.pauseAsync();
-          setIsPlayingVoice(false);
-        } else {
-          await voiceSound.playAsync();
-          setIsPlayingVoice(true);
-        }
-      } else {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
-          { shouldPlay: true },
-          (status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              setIsPlayingVoice(false);
-            }
-          }
-        );
-        setVoiceSound(sound);
-        setIsPlayingVoice(true);
-      }
-    } catch (err) {
-      console.log('Voice bio error:', err);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (voiceSound) {
-        voiceSound.unloadAsync();
-      }
-    };
-  }, [voiceSound]);
 
   const handleSaveProfile = () => {
     setProfileData((prev: any) => ({
