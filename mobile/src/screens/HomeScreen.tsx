@@ -396,7 +396,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 size={24}
                 color="#FFFFFF"
                 strokeWidth={2}
-                style={{ transform: [{ rotate: '-20deg' }] }}
               />
               <Text style={styles.actionText}>
                 {item.shareCount > 999
