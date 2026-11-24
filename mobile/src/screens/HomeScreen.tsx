@@ -17,8 +17,6 @@ import {
   Send,
   Search,
   Bell,
-  ChevronUp,
-  ChevronDown,
   LayoutGrid,
   Video as VideoIcon,
   Volume2,
@@ -209,24 +207,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Volume2 size={16} color="#FFFFFF" />
           )}
         </TouchableOpacity>
-
-        {/* Left Side: Up (^) and Down (v) Scroll Arrows */}
-        <View style={styles.leftNavigationArrows}>
-          <TouchableOpacity
-            style={styles.arrowButton}
-            onPress={scrollToPrev}
-            activeOpacity={0.75}
-          >
-            <ChevronUp size={20} color="#FFFFFF" strokeWidth={2.5} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.arrowButton, { marginTop: 10 }]}
-            onPress={scrollToNext}
-            activeOpacity={0.75}
-          >
-            <ChevronDown size={20} color="#FFFFFF" strokeWidth={2.5} />
-          </TouchableOpacity>
-        </View>
 
         {/* Right Side: Action Column (Heart, Grid/Comment, Share, Camera, Next Card) */}
         <View style={styles.rightActionsColumn}>
@@ -601,23 +581,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  leftNavigationArrows: {
-    position: 'absolute',
-    left: 14,
-    top: '46%',
-    zIndex: 20,
-    alignItems: 'center',
-  },
-  arrowButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
