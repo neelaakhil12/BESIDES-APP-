@@ -139,8 +139,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 185,
-    height: 185,
+    width: 115,
+    height: 115,
   },
   bottomPopupSection: {
     width: '100%',
