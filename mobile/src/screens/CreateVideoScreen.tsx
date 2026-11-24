@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,240 +7,344 @@ import {
   Image,
   TextInput,
   ScrollView,
-  Modal,
+  Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
+import { Video as VideoPlayer, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Scissors,
-  Sliders,
-  Sun,
-  Type,
-  Music,
-  Gauge,
-  Play,
-  Pause,
   X,
+  Camera,
+  Image as ImageIcon,
+  Video as VideoIcon,
   Check,
+  RotateCcw,
+  Play,
+  Square,
+  Sparkles,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
-import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface CreateVideoScreenProps {
   onClose: () => void;
   onPublishSuccess: () => void;
 }
 
+const AVAILABLE_TOPICS = [
+  'Movies',
+  'Sports',
+  'Music',
+  'Travel',
+  'Food',
+  'Comedy',
+  'Fashion',
+  'Fitness',
+  'Gaming',
+  'Technology',
+  'Art',
+  'Nature',
+];
+
 export const CreateVideoScreen: React.FC<CreateVideoScreenProps> = ({
   onClose,
   onPublishSuccess,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const { user } = useAuth();
 
-  // Video editor state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('normal'); // 'normal' | 'vintage' | 'cyber' | 'golden'
-  const [brightness, setBrightness] = useState(1.0);
-  const [selectedSpeed, setSelectedSpeed] = useState('1.0x');
-  const [selectedMusic, setSelectedMusic] = useState('Original Sound');
-  const [caption, setCaption] = useState('Enjoying the scenic views! 🌸 #Travel #Besides');
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-  const [activeEditorTool, setActiveEditorTool] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(['Travel', 'Nature']);
+  const [hasMedia, setHasMedia] = useState(false);
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const handlePublish = async () => {
-    setIsPublishing(true);
-    try {
-      const res = await api.post('/videos/upload', {
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
-        caption,
-        duration: 15.0,
+  const timerRef = useRef<any>(null);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const toggleTopic = (topic: string) => {
+    setSelectedTopics((prev) =>
+      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+    );
+  };
+
+  // Start 60-second video recording simulation
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordSeconds(0);
+    progressAnim.setValue(0);
+
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 60000,
+      useNativeDriver: false,
+    }).start();
+
+    timerRef.current = setInterval(() => {
+      setRecordSeconds((prev) => {
+        if (prev >= 60) {
+          stopRecording();
+          return 60;
+        }
+        return prev + 1;
       });
+    }, 1000);
+  };
 
-      if (res.data?.success) {
-        setShowPublishModal(false);
+  // Stop recording and save captured video
+  const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsRecording(false);
+    setHasMedia(true);
+    setMediaUri(
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    );
+  };
+
+  // Upload Photo / Video from gallery
+  const handlePickMedia = () => {
+    setHasMedia(true);
+    setMediaUri('https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800');
+  };
+
+  const handleRetake = () => {
+    setHasMedia(false);
+    setMediaUri(null);
+    setRecordSeconds(0);
+    progressAnim.setValue(0);
+  };
+
+  const handlePostMoment = () => {
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSuccess(true);
+      setTimeout(() => {
         onPublishSuccess();
-        setIsPublishing(false);
-        return;
-      }
-    } catch (err) {
-      // offline fallback
-    }
-    setShowPublishModal(false);
-    onPublishSuccess();
-    setIsPublishing(false);
+      }, 500);
+    }, 700);
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#000000' }]}>
-      {/* Top Bar: Close 'X' and 'Next' gradient button */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={onClose} style={styles.closeIcon}>
-          <X size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-
+    <View style={styles.container}>
+      {/* 1. TOP HEADER (New Moment + '✕' Close Button) */}
+      <View style={styles.headerRow}>
+        <Text style={styles.headerTitle}>New Moment</Text>
         <TouchableOpacity
-          style={styles.nextButton}
-          onPress={() => setShowPublishModal(true)}
-          activeOpacity={0.85}
+          style={styles.closeBtn}
+          onPress={onClose}
+          activeOpacity={0.7}
         >
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.nextGradient}
-          >
-            <Text style={styles.nextText}>Next</Text>
-          </LinearGradient>
+          <X size={20} color="#FFFFFF" strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
 
-      {/* Video Preview Center Area */}
-      <View style={styles.videoPreviewArea}>
-        <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600',
-          }}
-          style={[
-            styles.previewImage,
-            activeFilter === 'vintage' && { filter: 'sepia(0.5)' } as any,
-            activeFilter === 'cyber' && { filter: 'hue-rotate(90deg)' } as any,
-          ]}
-        />
-
-        {/* Play/Pause Button overlay */}
-        <TouchableOpacity
-          style={styles.playOverlayButton}
-          onPress={() => setIsPlaying(!isPlaying)}
-        >
-          {isPlaying ? (
-            <Pause size={28} color="#FFFFFF" />
-          ) : (
-            <Play size={28} color="#FFFFFF" fill="#FFFFFF" />
-          )}
-        </TouchableOpacity>
-
-        {/* Video Scrubber Timeline (matching 0:00 / 0:15 in screenshot) */}
-        <View style={styles.timelineScrubber}>
-          <Text style={styles.timeLabel}>0:00 / 0:15</Text>
-          <View style={styles.filmstripRow}>
-            {[1, 2, 3, 4, 5, 6].map((idx) => (
-              <View key={idx} style={styles.filmstripFrame}>
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100' }}
-                  style={styles.frameThumbnail}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 2. MAIN MEDIA PREVIEW BOX (With Camera Icon) */}
+        <View style={styles.mediaPreviewBox}>
+          {hasMedia && mediaUri ? (
+            <View style={StyleSheet.absoluteFillObject}>
+              {mediaUri.endsWith('.mp4') ? (
+                <VideoPlayer
+                  source={{ uri: mediaUri }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay
+                  isLooping
+                  isMuted
+                  useNativeControls={false}
                 />
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
+              ) : (
+                <Image
+                  source={{ uri: mediaUri }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+              )}
 
-      {/* Bottom Video Editing Toolbar (Trim, Filters, Adjust, Text, Music, Speed) */}
-      <View style={[styles.bottomToolbar, { backgroundColor: 'rgba(11, 8, 20, 0.95)' }]}>
-        {/* 1. Trim */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('trim')}
-        >
-          <Scissors size={20} color={activeEditorTool === 'trim' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Trim</Text>
-        </TouchableOpacity>
-
-        {/* 2. Filters */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('filters')}
-        >
-          <Sliders size={20} color={activeEditorTool === 'filters' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Filters</Text>
-        </TouchableOpacity>
-
-        {/* 3. Adjust */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('adjust')}
-        >
-          <Sun size={20} color={activeEditorTool === 'adjust' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Adjust</Text>
-        </TouchableOpacity>
-
-        {/* 4. Text */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('text')}
-        >
-          <Type size={20} color={activeEditorTool === 'text' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Text</Text>
-        </TouchableOpacity>
-
-        {/* 5. Music */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('music')}
-        >
-          <Music size={20} color={activeEditorTool === 'music' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Music</Text>
-        </TouchableOpacity>
-
-        {/* 6. Speed */}
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setActiveEditorTool('speed')}
-        >
-          <Gauge size={20} color={activeEditorTool === 'speed' ? colors.primary : '#FFFFFF'} />
-          <Text style={styles.toolLabel}>Speed</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Publish & Caption Modal */}
-      <Modal visible={showPublishModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.publishCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.publishHeader}>
-              <Text style={[styles.publishTitle, { color: colors.text }]}>
-                Publish Video
-              </Text>
-              <TouchableOpacity onPress={() => setShowPublishModal(false)}>
-                <X size={20} color={colors.textSecondary} />
+              {/* Retake Media Button */}
+              <TouchableOpacity
+                style={styles.retakeBtn}
+                onPress={handleRetake}
+                activeOpacity={0.8}
+              >
+                <RotateCcw size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.retakeBtnText}>Retake</Text>
               </TouchableOpacity>
             </View>
+          ) : isRecording ? (
+            /* Live Recording Active State */
+            <View style={styles.recordingOverlay}>
+              <View style={styles.liveTimerBadge}>
+                <View style={styles.recDot} />
+                <Text style={styles.liveTimerText}>{formatTimer(recordSeconds)} / 1:00</Text>
+              </View>
 
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-              Caption & Hashtags
-            </Text>
+              <TouchableOpacity
+                style={styles.stopRecordCircle}
+                onPress={stopRecording}
+                activeOpacity={0.8}
+              >
+                <Square size={20} color="#FFFFFF" fill="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Progress bar line */}
+              <View style={styles.recordProgressTrack}>
+                <Animated.View
+                  style={[
+                    styles.recordProgressFill,
+                    {
+                      width: progressAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      }),
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : (
+            /* Empty State with Centered Camera Icon */
+            <TouchableOpacity
+              style={styles.emptyMediaPrompt}
+              onPress={handlePickMedia}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cameraIconBox}>
+                <Camera size={38} color="#94A3B8" strokeWidth={1.8} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* 3. ACTION BUTTONS ROW: [Photo / video] & [Record · 60 s] */}
+        <View style={styles.actionButtonsRow}>
+          {/* Photo / video Button */}
+          <TouchableOpacity
+            style={styles.photoVideoBtn}
+            onPress={handlePickMedia}
+            activeOpacity={0.8}
+          >
+            <ImageIcon size={17} color="#FFFFFF" style={{ marginRight: 7 }} />
+            <Text style={styles.actionBtnText}>Photo / video</Text>
+          </TouchableOpacity>
+
+          {/* Record · 60 s Button (Beside Brand Gradient) */}
+          <TouchableOpacity
+            style={styles.record60Btn}
+            onPress={isRecording ? stopRecording : startRecording}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.recordGradient}
+            >
+              <VideoIcon size={17} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 7 }} />
+              <Text style={styles.recordBtnText}>
+                {isRecording ? `Stop (${recordSeconds}s)` : 'Record • 60 s'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. CAPTION SECTION */}
+        <View style={styles.captionSection}>
+          <Text style={styles.sectionLabel}>Caption</Text>
+          <View style={styles.captionInputWrapper}>
             <TextInput
-              style={[styles.captionInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
-              placeholder="Write a caption... #Travel #Vibe"
-              placeholderTextColor={colors.textMuted}
+              style={styles.captionInput}
+              placeholder="Write a caption for your moment..."
+              placeholderTextColor="#64748B"
               value={caption}
               onChangeText={setCaption}
               multiline
               numberOfLines={3}
+              textAlignVertical="top"
             />
-
-            <TouchableOpacity
-              style={styles.publishSubmitButton}
-              onPress={handlePublish}
-              disabled={isPublishing}
-            >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.publishGradient}
-              >
-                {isPublishing ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.publishText}>Publish Now</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+
+        {/* 5. TOPICS SECTION (Checkboxes with 12 Topics) */}
+        <View style={styles.topicsSection}>
+          <Text style={styles.sectionLabel}>Topics</Text>
+          <View style={styles.topicsGrid}>
+            {AVAILABLE_TOPICS.map((topic) => {
+              const isChecked = selectedTopics.includes(topic);
+              return (
+                <TouchableOpacity
+                  key={topic}
+                  style={styles.topicCheckboxRow}
+                  onPress={() => toggleTopic(topic)}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.checkboxBox,
+                      isChecked && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                  >
+                    {isChecked && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                  </View>
+                  <Text style={[styles.topicLabelText, isChecked && { color: '#FFFFFF', fontWeight: '700' }]}>
+                    {topic}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* 6. POST MOMENT SUBMIT BUTTON (Beside Brand Colors) */}
+        <TouchableOpacity
+          style={styles.postMomentBtn}
+          onPress={handlePostMoment}
+          disabled={isSubmitting}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.postMomentGradient}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : isSuccess ? (
+              <View style={styles.successRow}>
+                <Check size={18} color="#FFFFFF" strokeWidth={3} style={{ marginRight: 6 }} />
+                <Text style={styles.postMomentText}>Moment Posted!</Text>
+              </View>
+            ) : (
+              <Text style={styles.postMomentText}>Post Moment</Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 };
@@ -248,157 +352,252 @@ export const CreateVideoScreen: React.FC<CreateVideoScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
+    backgroundColor: '#07050E',
+    position: 'relative',
   },
-  topBar: {
-    height: 52,
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    zIndex: 20,
+    paddingTop: Platform.OS === 'ios' ? 48 : 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  closeIcon: {
-    padding: 6,
-  },
-  nextButton: {
-    height: 32,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  nextGradient: {
-    flex: 1,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextText: {
+  headerTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 22,
     fontWeight: '800',
+    letterSpacing: -0.3,
   },
-  videoPreviewArea: {
-    flex: 1,
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    marginHorizontal: 16,
-    borderRadius: 24,
-    overflow: 'hidden',
   },
-  previewImage: {
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 70,
+  },
+  mediaPreviewBox: {
     width: '100%',
-    height: '100%',
-  },
-  playOverlayButton: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    height: 250,
+    borderRadius: 20,
+    backgroundColor: '#120E22',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timelineScrubber: {
-    position: 'absolute',
-    bottom: 14,
-    left: 12,
-    right: 12,
+  emptyMediaPrompt: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  timeLabel: {
+  cameraIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  retakeBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  retakeBtnText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
-  filmstripRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 8,
-    padding: 3,
-  },
-  filmstripFrame: {
-    width: 44,
-    height: 34,
-    marginHorizontal: 2,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  frameThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  bottomToolbar: {
-    height: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  toolItem: {
+  recordingOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  toolLabel: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
   },
-  publishCard: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-  },
-  publishHeader: {
+  liveTimerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  publishTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  captionInput: {
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    fontSize: 13,
-    height: 80,
-    textAlignVertical: 'top',
     marginBottom: 20,
   },
-  publishSubmitButton: {
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
+  recDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    marginRight: 6,
   },
-  publishGradient: {
+  liveTimerText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stopRecordCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  recordProgressTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  recordProgressFill: {
+    height: '100%',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    gap: 10,
+  },
+  photoVideoBtn: {
     flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  publishText: {
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  record60Btn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  recordGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  recordBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  captionSection: {
+    marginTop: 16,
+  },
+  sectionLabel: {
+    color: '#CBD5E1',
+    fontSize: 13.5,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  captionInputWrapper: {
+    backgroundColor: '#120E22',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 80,
+  },
+  captionInput: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '500',
+    lineHeight: 19,
+    outlineStyle: 'none',
+  } as any,
+  topicsSection: {
+    marginTop: 18,
+  },
+  topicsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  topicCheckboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '30%',
+    marginBottom: 4,
+  },
+  checkboxBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  topicLabelText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  postMomentBtn: {
+    marginTop: 22,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  postMomentGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postMomentText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
