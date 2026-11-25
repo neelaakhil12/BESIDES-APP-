@@ -11,6 +11,7 @@ import {
   Platform,
   Animated,
   PanResponder,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -30,6 +31,7 @@ import {
   MessageCircle,
   UserCheck,
   Check,
+  CheckCircle,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { MOCK_EXPLORE_PEOPLE } from '../services/mockData';
@@ -61,9 +63,28 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
   // Location discovery permission state (enabled so map radar & people are interactive immediately)
   const [isLocationEnabled, setIsLocationEnabled] = useState(true);
 
-  // Filter distance (e.g. 100m, 300m, 500m, 1km)
+  // Filter distance (100m, 300m, 500m, 2km)
   const [distanceFilter, setDistanceFilter] = useState('Within 100 m');
   const [isDiscoverable, setIsDiscoverable] = useState(true);
+  const [showDiscoverySettings, setShowDiscoverySettings] = useState(false);
+
+  // Dynamic radar radius and avatar spacing according to selected distance
+  const getDistanceMetrics = () => {
+    switch (distanceFilter) {
+      case 'Within 100 m':
+        return { radarSize: 170, waveSize: 260, baseRadius: 85 };
+      case 'Within 300 m':
+        return { radarSize: 220, waveSize: 330, baseRadius: 110 };
+      case 'Within 500 m':
+        return { radarSize: 270, waveSize: 400, baseRadius: 135 };
+      case 'Within 2 km':
+        return { radarSize: 320, waveSize: 470, baseRadius: 160 };
+      default:
+        return { radarSize: 220, waveSize: 330, baseRadius: 110 };
+    }
+  };
+
+  const { radarSize, waveSize, baseRadius } = getDistanceMetrics();
 
   // Selected user for map pin highlight
   const [selectedUser, setSelectedUser] = useState<any | null>(MOCK_EXPLORE_PEOPLE[1] || MOCK_EXPLORE_PEOPLE[0]);
@@ -401,7 +422,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
         <View style={styles.filtersRow}>
           <TouchableOpacity
             style={styles.filterPill}
-            onPress={cycleDistance}
+            onPress={() => setShowDiscoverySettings(true)}
             activeOpacity={0.8}
           >
             <Compass size={13} color={colors.primary} style={{ marginRight: 5 }} />
@@ -586,8 +607,26 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 {/* Central Glowing Radar Circle & User Indicator */}
                 <View style={styles.centralRadarContainer} pointerEvents="box-none">
-                  <View style={styles.radarOuterWave} />
-                  <View style={styles.centralRadarBoundary}>
+                  <View
+                    style={[
+                      styles.radarOuterWave,
+                      {
+                        width: waveSize,
+                        height: waveSize,
+                        borderRadius: waveSize / 2,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.centralRadarBoundary,
+                      {
+                        width: radarSize,
+                        height: radarSize,
+                        borderRadius: radarSize / 2,
+                      },
+                    ]}
+                  >
                     <View style={styles.userCenterDot}>
                       <View style={styles.userCenterInnerDot} />
                     </View>
@@ -600,9 +639,9 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                     {filteredPeople.map((person, idx) => {
                       const isSelected = selectedUser?.id === person.id;
                       const angles = [-65, -15, 50, 130, 210];
-                      const radii = [110, 130, 105, 125, 100];
+                      const radiusRatio = [1.0, 1.15, 0.95, 1.1, 0.9][idx % 5];
+                      const radius = baseRadius * radiusRatio;
                       const angle = (angles[idx % angles.length] * Math.PI) / 180;
-                      const radius = radii[idx % radii.length];
                       const offsetX = Math.cos(angle) * radius;
                       const offsetY = Math.sin(angle) * radius;
 
@@ -677,16 +716,6 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 </View>
               )}
 
-              {/* Distance Pill Badge on Top Left */}
-              <TouchableOpacity
-                style={styles.mapDistanceBadge}
-                onPress={cycleDistance}
-                activeOpacity={0.8}
-              >
-                <SlidersHorizontal size={12} color="#84CC16" />
-                <Text style={styles.mapDistanceBadgeText}>{distanceFilter}</Text>
-              </TouchableOpacity>
-
               {/* Floating Map Controls on Right Edge */}
               <View style={styles.mapControlsColumn}>
                 <TouchableOpacity
@@ -723,7 +752,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={cycleDistance}
+                  onPress={() => setShowDiscoverySettings(true)}
                   activeOpacity={0.7}
                 >
                   <SlidersHorizontal size={18} color="#FFFFFF" />
@@ -940,6 +969,88 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
           </ScrollView>
         )}
       </View>
+
+      {/* 5. DISCOVERY SETTINGS BOTTOM SHEET MODAL */}
+      {showDiscoverySettings && (
+        <View style={styles.settingsModalOverlay}>
+          <TouchableOpacity
+            style={styles.settingsModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDiscoverySettings(false)}
+          />
+          <View style={styles.settingsModalCard}>
+            {/* Top Drag Indicator */}
+            <View style={styles.settingsDragIndicator} />
+
+            {/* Header */}
+            <View style={styles.settingsHeader}>
+              <Text style={styles.settingsTitle}>Discovery settings</Text>
+              <Text style={styles.settingsSubtitle}>Your location stays private.</Text>
+            </View>
+
+            {/* Section 1: Discovery distance */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>Discovery distance</Text>
+              <View style={styles.distanceOptionsRow}>
+                {[
+                  { id: 'Within 100 m', label: '100 m' },
+                  { id: 'Within 300 m', label: '300 m' },
+                  { id: 'Within 500 m', label: '500 m' },
+                  { id: 'Within 2 km', label: '2 km' },
+                ].map((opt) => {
+                  const isActive = distanceFilter === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[
+                        styles.distancePillBtn,
+                        isActive && styles.distancePillBtnActive,
+                      ]}
+                      onPress={() => setDistanceFilter(opt.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.distancePillText,
+                          isActive && styles.distancePillTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Section 2: Nearby discovery Switch */}
+            <View style={styles.settingsSection}>
+              <View style={styles.nearbyDiscoveryRow}>
+                <View style={{ flex: 1, paddingRight: 16 }}>
+                  <Text style={styles.settingsSectionTitle}>Nearby discovery</Text>
+                  <Text style={styles.nearbyDiscoveryDesc}>
+                    When off, you cannot see nearby people and they cannot see you.
+                  </Text>
+                </View>
+                <Switch
+                  value={isDiscoverable}
+                  onValueChange={setIsDiscoverable}
+                  trackColor={{ false: '#2D2548', true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+
+            {/* Section 3: Privacy check note */}
+            <View style={styles.privacyGuaranteeRow}>
+              <CheckCircle size={18} color={colors.primary} style={{ marginTop: 2, marginRight: 10 }} />
+              <Text style={styles.privacyGuaranteeText}>
+                Only an approximate position and distance are shared. Location is requested while this page is open, never continuously tracked in the background.
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -1300,23 +1411,17 @@ const styles = StyleSheet.create({
   },
   radarOuterWave: {
     position: 'absolute',
-    width: 330,
-    height: 330,
-    borderRadius: 165,
     borderWidth: 1,
-    borderColor: 'rgba(132, 204, 22, 0.22)',
+    borderColor: 'rgba(224, 40, 125, 0.22)',
     borderStyle: 'dashed',
   },
   centralRadarBoundary: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
     borderWidth: 2,
-    borderColor: '#84CC16',
-    backgroundColor: 'rgba(132, 204, 22, 0.07)',
+    borderColor: '#E0287D',
+    backgroundColor: 'rgba(224, 40, 125, 0.07)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#84CC16',
+    shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
@@ -1326,7 +1431,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(132, 204, 22, 0.35)',
+    backgroundColor: 'rgba(224, 40, 125, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1334,31 +1439,123 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#84CC16',
+    backgroundColor: '#E0287D',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
 
-  // DISTANCE BADGE
-  mapDistanceBadge: {
-    position: 'absolute',
-    top: 18,
-    left: 16,
+  // DISCOVERY SETTINGS BOTTOM SHEET MODAL
+  settingsModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    justifyContent: 'flex-end',
+  },
+  settingsModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  settingsModalCard: {
+    backgroundColor: '#161129',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  settingsDragIndicator: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  settingsHeader: {
+    marginBottom: 20,
+  },
+  settingsTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  settingsSubtitle: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  settingsSection: {
+    marginBottom: 22,
+  },
+  settingsSectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  distanceOptionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  distancePillBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  distancePillBtnActive: {
+    backgroundColor: '#E0287D',
+    borderColor: '#E0287D',
+    shadowColor: '#E0287D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  distancePillText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  distancePillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  nearbyDiscoveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(22, 17, 41, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(132, 204, 22, 0.4)',
-    gap: 6,
-    zIndex: 25,
+    justifyContent: 'space-between',
   },
-  mapDistanceBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+  nearbyDiscoveryDesc: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  privacyGuaranteeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(224, 40, 125, 0.08)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(224, 40, 125, 0.2)',
+  },
+  privacyGuaranteeText: {
+    flex: 1,
+    color: '#CBD5E1',
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   // PRIVACY OVERLAY (When Location Discovery is OFF)
@@ -1443,9 +1640,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   pinAvatarRingActive: {
-    borderColor: '#84CC16',
+    borderColor: '#E0287D',
     borderWidth: 3,
-    shadowColor: '#84CC16',
+    shadowColor: '#E0287D',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 10,
@@ -1460,8 +1657,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#84CC16',
-    shadowColor: '#84CC16',
+    borderColor: '#E0287D',
+    shadowColor: '#E0287D',
     shadowOpacity: 0.6,
     shadowRadius: 6,
     elevation: 6,
