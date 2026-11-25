@@ -154,6 +154,7 @@ const MainNavigator: React.FC = () => {
       <MobileFrame>
         <ProfileScreen
           userId={selectedProfileId}
+          onBack={() => setCurrentScreen('main')}
           onOpenSettings={() => setCurrentScreen('settings')}
         />
       </MobileFrame>

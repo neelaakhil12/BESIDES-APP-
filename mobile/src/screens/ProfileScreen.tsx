@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TextInput,
   Share,
   Platform,
+  Animated,
 } from 'react-native';
 import {
   Settings,
@@ -25,54 +26,104 @@ import {
   Play,
   X,
   Check,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { MOCK_USERS, MOCK_VIDEOS } from '../services/mockData';
+import { MOCK_USERS, MOCK_VIDEOS, MOCK_DECK_REELS } from '../services/mockData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface ProfileScreenProps {
   userId?: string;
   onOpenSettings: () => void;
+  onBack?: () => void;
   onSelectVideo?: (video: any) => void;
   onNavigateCreate?: () => void;
 }
 
+const resolveProfileData = (targetId: string, authUser: any) => {
+  if (!targetId || targetId === authUser?.id || targetId === authUser?.username) {
+    return {
+      fullName: authUser?.fullName || 'Akhil Harish Neela',
+      username: authUser?.username || 'user_11c2796d',
+      avatarUrl:
+        authUser?.profile?.avatarUrl ||
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+      stats: { moments: 0, audience: 0, interests: 0 },
+    };
+  }
+
+  if (targetId === 'maya.films') {
+    return {
+      fullName: 'Maya Ortiz',
+      username: 'maya.films',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+      stats: { moments: 5, audience: 16, interests: 3 },
+    };
+  }
+
+  if (targetId === 'dia.de.ana') {
+    return {
+      fullName: 'Diana Ana',
+      username: 'dia.de.ana',
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500',
+      stats: { moments: 12, audience: '36.5K', interests: 145 },
+    };
+  }
+
+  const mockU = (MOCK_USERS as any)[targetId];
+  if (mockU) {
+    return {
+      fullName: mockU.fullName,
+      username: mockU.username,
+      avatarUrl: mockU.profile?.avatarUrl || mockU.avatarUrl,
+      stats: {
+        moments: mockU.stats?.videos || 8,
+        audience: mockU.stats?.audience || '14.2K',
+        interests: mockU.stats?.interests || 120,
+      },
+    };
+  }
+
+  const deckItem = MOCK_DECK_REELS.find((r: any) => r.user?.username === targetId);
+  if (deckItem) {
+    return {
+      fullName: deckItem.user.username.replace('.', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      username: deckItem.user.username,
+      avatarUrl: deckItem.user.avatarUrl,
+      stats: { moments: 10, audience: '22.4K', interests: 98 },
+    };
+  }
+
+  return {
+    fullName: targetId.replace('.', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+    username: targetId,
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+    stats: { moments: 5, audience: '10K', interests: 50 },
+  };
+};
+
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userId,
   onOpenSettings,
+  onBack,
   onSelectVideo,
   onNavigateCreate,
 }) => {
   const { colors } = useTheme();
   const { user: authUser, updateUser } = useAuth();
 
-  // Selected profile user data
-  const targetId = userId || authUser?.id || 'akhil';
-  const initialUser =
-    (MOCK_USERS as any)[targetId] ||
-    authUser || {
-      fullName: 'Akhil Harish Neela',
-      username: 'user_11c2796d',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
-    };
+  const isOtherUser = !!userId && userId !== authUser?.id && userId !== authUser?.username;
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [profileData, setProfileData] = useState<any>(() => resolveProfileData(userId || '', authUser));
 
-  const [profileData, setProfileData] = useState<any>({
-    fullName: authUser?.fullName || 'Akhil Harish Neela',
-    username: authUser?.username || 'user_11c2796d',
-    avatarUrl:
-      authUser?.profile?.avatarUrl ||
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
-    stats: {
-      moments: 0,
-      audience: 0,
-      interests: 0,
-    },
-  });
+  useEffect(() => {
+    setProfileData(resolveProfileData(userId || '', authUser));
+  }, [userId, authUser]);
 
   // Tabs: 'moments' | 'video_comments' | 'liked'
   const [activeTab, setActiveTab] = useState<'moments' | 'video_comments' | 'liked'>('moments');
@@ -84,10 +135,59 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Voice Bio Audio playback state
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const avatarScale = useRef(new Animated.Value(1)).current;
+  const ringPulse = useRef(new Animated.Value(0)).current;
+
+  // Animate avatar zoom and glow ring during voice bio speaking
+  useEffect(() => {
+    if (isPlayingVoice) {
+      // Smoothly zoom up avatar to 1.25x
+      Animated.spring(avatarScale, {
+        toValue: 1.25,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+
+      // Pulsing green glow ring around avatar
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ringPulse, {
+            toValue: 1,
+            duration: 650,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ringPulse, {
+            toValue: 0,
+            duration: 650,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      loop.start();
+
+      return () => {
+        loop.stop();
+      };
+    } else {
+      // Smoothly return avatar to original scale (1.0)
+      Animated.spring(avatarScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: true,
+      }).start();
+      ringPulse.setValue(0);
+    }
+  }, [isPlayingVoice]);
 
   // Speak greeting using Web Speech API (Free, zero API key required!)
   const speakGreeting = (name: string) => {
-    const greetingText = `Hi, this is ${name}, nice to meet you.`;
+    // Self profile: "Hi, this is [Name]."
+    // Other profile: "Welcome to my profile. Hi, this is [Name]."
+    const greetingText = isOtherUser
+      ? `Welcome to my profile. Hi, this is ${name}.`
+      : `Hi, this is ${name}.`;
 
     if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -101,7 +201,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       window.speechSynthesis.speak(utterance);
     } else {
       setIsPlayingVoice(true);
-      setTimeout(() => setIsPlayingVoice(false), 2600);
+      setTimeout(() => setIsPlayingVoice(false), isOtherUser ? 2800 : 1800);
     }
   };
 
@@ -161,8 +261,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: '#0B0814' }]}>
-      {/* 1. TOP HEADER (Center Username, Right Settings Button) */}
+      {/* 1. TOP HEADER (Center Username, Right Settings Button, Left Back Button if provided) */}
       <View style={styles.header}>
+        {onBack ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={onBack}
+            activeOpacity={0.8}
+          >
+            <ChevronLeft size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.headerCenter}>
           <Text style={styles.headerUsername}>{profileData.username}</Text>
         </View>
@@ -181,51 +291,108 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 110 }}
       >
-        {/* 2. PROFILE HERO (Avatar + Camera Badge on Left, Name + Voice Bio on Right) */}
+        {/* 2. PROFILE HERO (Animated Avatar on Left, Name + Voice Bio on Right) */}
         <View style={styles.heroSection}>
-          {/* Avatar with Camera Icon Badge */}
+          {/* Avatar with Animated Zoom & Pulsing Green Glow Ring */}
           <View style={styles.avatarWrapper}>
-            <Image
-              source={{ uri: profileData.avatarUrl }}
-              style={styles.avatarImage}
-            />
-            <TouchableOpacity
-              style={styles.cameraBadge}
-              onPress={() => setShowEditModal(true)}
-              activeOpacity={0.85}
+            {isPlayingVoice && (
+              <Animated.View
+                style={[
+                  styles.avatarGlowRing,
+                  {
+                    transform: [{ scale: avatarScale }],
+                    opacity: ringPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.55, 1],
+                    }),
+                  },
+                ]}
+              />
+            )}
+
+            <Animated.View
+              style={[
+                styles.animatedAvatarContainer,
+                {
+                  transform: [{ scale: avatarScale }],
+                  borderColor: isPlayingVoice ? '#22C55E' : 'rgba(255, 255, 255, 0.2)',
+                  borderWidth: isPlayingVoice ? 2.5 : 1.5,
+                },
+              ]}
             >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.cameraBadgeGradient}
+              <Image
+                source={{ uri: profileData.avatarUrl }}
+                style={styles.avatarImage}
+              />
+            </Animated.View>
+
+            {!isOtherUser && !isPlayingVoice && (
+              <TouchableOpacity
+                style={styles.cameraBadge}
+                onPress={() => setShowEditModal(true)}
+                activeOpacity={0.85}
               >
-                <Camera size={13} color="#FFFFFF" strokeWidth={2.5} />
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.cameraBadgeGradient}
+                >
+                  <Camera size={13} color="#FFFFFF" strokeWidth={2.5} />
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Name, Handle, and Voice Bio Pill */}
           <View style={styles.heroMeta}>
-            <Text style={styles.fullNameText}>{profileData.fullName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.fullNameText}>{profileData.fullName}</Text>
+              <View
+                style={{
+                  backgroundColor: '#22C55E',
+                  borderRadius: 9,
+                  width: 17,
+                  height: 17,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 6,
+                }}
+              >
+                <Check size={11} color="#000000" strokeWidth={3} />
+              </View>
+            </View>
             <Text style={styles.handleText}>@{profileData.username}</Text>
+            {isOtherUser && (
+              <Text style={{ color: '#22C55E', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+                Demo profile
+              </Text>
+            )}
 
             {/* Voice Bio Pill Button */}
             <TouchableOpacity
               style={[
                 styles.voiceBioPill,
-                isPlayingVoice && { borderColor: colors.primary },
+                isPlayingVoice && {
+                  borderColor: '#22C55E',
+                  backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                },
               ]}
               onPress={togglePlayVoiceBio}
               activeOpacity={0.8}
             >
               {isPlayingVoice ? (
-                <VolumeX size={15} color={colors.primary} style={{ marginRight: 6 }} />
+                <Volume2 size={15} color="#22C55E" style={{ marginRight: 6 }} />
               ) : (
                 <Volume2 size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
               )}
-              <Text style={styles.voiceBioText}>
-                {isPlayingVoice ? 'Playing bio...' : 'Voice bio • generated voice'}
+              <Text
+                style={[
+                  styles.voiceBioText,
+                  isPlayingVoice && { color: '#FFFFFF', fontWeight: '700' },
+                ]}
+              >
+                {isPlayingVoice ? 'Speaking...' : 'Voice bio • generated voice'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -253,23 +420,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
         </View>
 
-        {/* 4. ACTION BUTTONS ROW (Edit Profile, Share Profile, Settings Gear) */}
+        {/* 4. ACTION BUTTONS ROW (Edit / Follow Profile, Share Profile, Settings Gear) */}
         <View style={styles.actionsRow}>
-          {/* A. Edit Profile Button (Besides Vibrant Brand Gradient) */}
-          <TouchableOpacity
-            style={styles.editProfileButtonWrapper}
-            onPress={() => setShowEditModal(true)}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.editProfileGradient}
+          {isOtherUser ? (
+            /* Follow Button for Other Users */
+            <TouchableOpacity
+              style={styles.editProfileButtonWrapper}
+              onPress={() => setIsFollowing((prev) => !prev)}
+              activeOpacity={0.85}
             >
-              <Text style={styles.editProfileText}>Edit Profile</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={
+                  isFollowing
+                    ? ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.15)']
+                    : [colors.gradientStart, colors.gradientEnd]
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.editProfileGradient}
+              >
+                <Text style={styles.editProfileText}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            /* A. Edit Profile Button for Self */
+            <TouchableOpacity
+              style={styles.editProfileButtonWrapper}
+              onPress={() => setShowEditModal(true)}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.editProfileGradient}
+              >
+                <Text style={styles.editProfileText}>Edit Profile</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* B. Share Profile Button */}
           <TouchableOpacity
@@ -535,6 +726,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    top: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
 
   scrollArea: {
     flex: 1,
@@ -546,32 +751,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 16,
+    paddingBottom: 22,
+    zIndex: 20,
+    overflow: 'visible',
   },
   avatarWrapper: {
     position: 'relative',
-    marginRight: 16,
+    marginRight: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 86,
+    height: 86,
+    overflow: 'visible',
+    zIndex: 20,
   },
-  avatarImage: {
+  avatarGlowRing: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2.5,
+    borderColor: '#22C55E',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 5,
+  },
+  animatedAvatarContainer: {
     width: 82,
     height: 82,
     borderRadius: 41,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    overflow: 'hidden',
     backgroundColor: '#161129',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   cameraBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    bottom: 0,
+    right: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     overflow: 'hidden',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#0B0814',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 6,
   },
   cameraBadgeGradient: {
     width: '100%',
@@ -619,6 +858,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     marginHorizontal: 16,
+    marginTop: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',

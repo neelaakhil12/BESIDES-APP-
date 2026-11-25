@@ -37,10 +37,10 @@ import { VideoCommentsModal } from './VideoCommentsModal';
 import { NewReplyModal } from './NewReplyModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
-const CARD_WIDTH = 295;
+const CARD_WIDTH = 275;
 const CARD_SPACING = 14;
 const ITEM_WIDTH = CARD_WIDTH + CARD_SPACING;
-const CARD_HEIGHT = 480;
+const CARD_HEIGHT = 440;
 
 interface HomeScreenProps {
   onOpenSearch?: () => void;
@@ -124,6 +124,77 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Active index when browsing in 3D Card Deck mode
   const [deckActiveIndex, setDeckActiveIndex] = useState(0);
+
+  // Mini Preview Deck scrub index (0 to 14) matching video reference
+  const [miniDeckIndex, setMiniDeckIndex] = useState(0);
+  const miniDeckIndexRef = useRef(0);
+  miniDeckIndexRef.current = miniDeckIndex;
+  const lastScrubX = useRef(0);
+
+  // Sync mini deck index with current video if not manually scrubbing
+  useEffect(() => {
+    setMiniDeckIndex(currentIndex);
+  }, [currentIndex]);
+
+  const handleOpenDeckFromMini = () => {
+    setDeckSource('reel');
+    setDeckActiveIndex(miniDeckIndexRef.current);
+    deckActiveIndexRef.current = miniDeckIndexRef.current;
+    deckPanX.setValue(0);
+    setIsDeckPaused(false);
+    setIsPaused(true);
+    setIsDeckMode(true);
+  };
+
+  // Handle click on mini deck to shuffle cards (right side advances, left side goes back)
+  const handleMiniDeckClick = (clientX: number, targetElem: any) => {
+    if (!targetElem) {
+      setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1));
+      return;
+    }
+    const rect = targetElem.getBoundingClientRect ? targetElem.getBoundingClientRect() : null;
+    if (rect && rect.width > 0) {
+      const relativeX = clientX - rect.left;
+      // If clicked on the right half -> advance to next card
+      if (relativeX >= rect.width / 2) {
+        setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1));
+      } else {
+        // If clicked on the left half -> go back to previous card
+        setMiniDeckIndex((prev) => Math.max(0, prev - 1));
+      }
+    } else {
+      setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1));
+    }
+  };
+
+  const miniPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 4,
+      onPanResponderGrant: () => {
+        lastScrubX.current = 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const delta = gestureState.dx - lastScrubX.current;
+        if (Math.abs(delta) > 10) {
+          const step = delta > 0 ? 1 : -1;
+          setMiniDeckIndex((prev) => Math.max(0, Math.min(videos.length - 1, prev + step)));
+          lastScrubX.current = gestureState.dx;
+        }
+      },
+      onPanResponderRelease: (e, gestureState) => {
+        // If it was a simple click/tap without dragging:
+        if (Math.abs(gestureState.dx) < 6 && Math.abs(gestureState.dy) < 6) {
+          const clientX =
+            (e.nativeEvent as any)?.clientX ||
+            (e.nativeEvent as any)?.pageX ||
+            0;
+          const target = (e.currentTarget as any);
+          handleMiniDeckClick(clientX, target);
+        }
+      },
+    })
+  ).current;
 
   // Mute state
   const [isMuted, setIsMuted] = useState(true);
@@ -509,6 +580,131 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           </View>
+
+        {/* Floating Mini Preview Deck (Scrolls WITH this reel item!) */}
+        {!isDeckMode && !selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
+          renderMiniPreviewDeck(index)
+        )}
+      </View>
+    );
+  };
+
+  // =========================================================================
+  // 1.5 RENDER MINI PREVIEW DECK (Reusable helper for reel items & deck mode)
+  // =========================================================================
+  const renderMiniPreviewDeck = (reelIndex?: number) => {
+    return (
+      <View style={styles.floatingMiniPreviewDeck}>
+        {/* Stacked Cards behind to the LEFT (cards with index < miniDeckIndex) */}
+        {miniDeckIndex > 2 && (
+          <View style={styles.miniStackLeft3} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex - 3]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTintDarker} />
+          </View>
+        )}
+        {miniDeckIndex > 1 && (
+          <View style={styles.miniStackLeft2} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex - 2]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTintDark} />
+          </View>
+        )}
+        {miniDeckIndex > 0 && (
+          <View style={styles.miniStackLeft1} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex - 1]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTint} />
+          </View>
+        )}
+
+        {/* LEFT SIDE CLICK TO SHUFFLE PREVIOUS CARD */}
+        <TouchableOpacity
+          style={styles.miniStackLeftTouchZone}
+          onPress={() => setMiniDeckIndex((prev) => Math.max(0, prev - 1))}
+          activeOpacity={0.7}
+        />
+
+        {/* Stacked Cards behind to the RIGHT (cards with index > miniDeckIndex) */}
+        {miniDeckIndex < videos.length - 3 && (
+          <View style={styles.miniStackRight3} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex + 3]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTintDarker} />
+          </View>
+        )}
+        {miniDeckIndex < videos.length - 2 && (
+          <View style={styles.miniStackRight2} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex + 2]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTintDark} />
+          </View>
+        )}
+        {miniDeckIndex < videos.length - 1 && (
+          <View style={styles.miniStackRight1} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex + 1]?.thumbnailUrl }}
+              style={styles.miniStackImg}
+            />
+            <View style={styles.miniStackTint} />
+          </View>
+        )}
+
+        {/* RIGHT SIDE CLICK TO SHUFFLE NEXT CARD */}
+        <TouchableOpacity
+          style={styles.miniStackRightTouchZone}
+          onPress={() => setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1))}
+          activeOpacity={0.7}
+        />
+
+        {/* ACTIVE SMALL CARD (Clicking opens the Pop-Up Reels Card!) */}
+        <TouchableOpacity
+          style={styles.miniCardMain}
+          onPress={handleOpenDeckFromMini}
+          activeOpacity={0.88}
+        >
+          <Image
+            source={{ uri: videos[miniDeckIndex]?.thumbnailUrl }}
+            style={styles.deckThumbnail}
+          />
+
+          {/* Subtle bottom vignette gradient for avatar contrast */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.55)']}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+
+          {/* Mini Creator Avatar Badge with Green Ring at Bottom-Left */}
+          <View style={styles.deckAvatarBadge} pointerEvents="none">
+            <Image
+              source={{ uri: videos[miniDeckIndex]?.user?.avatarUrl }}
+              style={styles.deckAvatarImg}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* Top Floating Badge: 📹 index/15 (Clicking opens the Pop-Up Reels Card!) */}
+        <TouchableOpacity
+          style={styles.deckBadge}
+          onPress={handleOpenDeckFromMini}
+          activeOpacity={0.8}
+        >
+          <VideoIcon size={12} color="#22C55E" fill="#22C55E" style={{ marginRight: 3.5 }} />
+          <Text style={styles.deckBadgeText}>
+            {`${miniDeckIndex + 1}/15`}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -714,20 +910,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Top Bar on Active Card (← @creator + Play/Pause + Mute) */}
           {isActive && (
             <View style={styles.deckCardTopBar}>
-              <TouchableOpacity
-                style={styles.deckCardUserRow}
-                onPress={() => {
-                  if (deckSource === 'comments') {
-                    handleCloseDeckToComments();
-                  } else {
-                    setIsDeckMode(false);
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <ArrowLeft size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                <Text style={styles.deckCardUsername}>@{item.user.username}</Text>
-              </TouchableOpacity>
+              <View style={styles.deckCardUserRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (deckSource === 'comments') {
+                      handleCloseDeckToComments();
+                    } else {
+                      setIsDeckMode(false);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                  style={{ paddingRight: 5 }}
+                >
+                  <ArrowLeft size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.deckCardUsername}>@{item.user.username}</Text>
+                </TouchableOpacity>
+              </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {/* Play/Pause Button */}
@@ -763,12 +967,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {isActive && (
             <View style={styles.deckCardBottomMeta}>
               <View style={styles.deckCardCreatorRow}>
-                <Image source={{ uri: item.user.avatarUrl }} style={styles.deckCardAvatar} />
+                <TouchableOpacity
+                  onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: item.user.avatarUrl }} style={styles.deckCardAvatar} />
+                </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.deckCardCreatorName}>{item.user.username}</Text>
-                    <Text style={styles.deckCardTimeAgo}>• {item.timeAgo || '5d'}</Text>
-                  </View>
+                  <TouchableOpacity
+                    onPress={() => onOpenProfile && onOpenProfile(item.user.username)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.deckCardCreatorName}>{item.user.username}</Text>
+                      <Text style={styles.deckCardTimeAgo}>• {item.timeAgo || '5d'}</Text>
+                    </View>
+                  </TouchableOpacity>
                   <Text style={styles.deckCardCaption} numberOfLines={2}>
                     {item.caption}
                   </Text>
@@ -975,46 +1189,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           </TouchableOpacity>
-        </View>
-      )}
 
-      {/* 4. FLOATING MINI PREVIEW CARD (Hidden when New Reply, Video Comments, or Comments are open) */}
-      {!selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
-        <TouchableOpacity
-          style={styles.floatingMiniPreviewDeck}
-          onPress={() => {
-            if (isDeckMode) {
-              setIsDeckMode(false);
-            } else {
-              handleOpenDeckMode();
-            }
-          }}
-          activeOpacity={0.85}
-        >
-          {/* Stack 3D Layer Underlay */}
-          <View style={styles.deckCardUnderlay} />
-          {/* Main Preview Card */}
-          <View style={styles.deckCardMain}>
-            <Image
-              source={{ uri: nextReel?.thumbnailUrl || videos[currentIndex]?.thumbnailUrl }}
-              style={styles.deckThumbnail}
-            />
-            {/* Badge: 📹 index/15 */}
-            <View style={styles.deckBadge}>
-              <VideoIcon size={9} color="#FFFFFF" style={{ marginRight: 2 }} />
-              <Text style={styles.deckBadgeText}>
-                {`${(isDeckMode ? deckActiveIndex : currentIndex) + 1}/15`}
-              </Text>
-            </View>
-            {/* Mini Creator Avatar Badge */}
-            <View style={styles.deckAvatarBadge}>
-              <Image
-                source={{ uri: nextReel?.user?.avatarUrl || videos[currentIndex]?.user?.avatarUrl }}
-                style={styles.deckAvatarImg}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
+          {/* Mini preview deck inside Deck Mode Overlay beside resume pill */}
+          {!selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
+            renderMiniPreviewDeck()
+          )}
+        </View>
       )}
 
       {/* 5. VIDEO COMMENTS 3-COLUMN MODAL (Opens when clicking 15-grid button) */}
@@ -1166,10 +1346,10 @@ const styles = StyleSheet.create({
   rightActionsColumn: {
     position: 'absolute',
     right: 14,
-    bottom: 175,
+    bottom: 204,
     alignItems: 'center',
     zIndex: 20,
-    gap: 14,
+    gap: 12,
   },
   actionItem: {
     alignItems: 'center',
@@ -1218,65 +1398,186 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  // 3D STACKED PREVIEW DECK BUTTON
+  // 3D STACKED PREVIEW DECK (Matching client video reference 200%)
   floatingMiniPreviewDeck: {
     position: 'absolute',
-    bottom: 84,
+    bottom: 76,
     right: 14,
-    width: 58,
-    height: 74,
+    width: 124,
+    height: 126,
     zIndex: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
-  deckCardUnderlay: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 58,
-    height: 74,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    transform: [{ rotate: '5deg' }],
-  },
-  deckCardMain: {
-    width: 58,
-    height: 74,
-    borderRadius: 12,
+  miniCardMain: {
+    width: 94,
+    height: 122,
+    borderRadius: 18,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderWidth: 1.6,
+    borderColor: 'rgba(255, 255, 255, 0.75)',
     backgroundColor: '#1E1836',
     position: 'relative',
+    zIndex: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
+  miniStackImg: {
+    width: '100%',
+    height: '100%',
+  },
+  miniStackTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  miniStackTintDark: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+  },
+  miniStackTintDarker: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.76)',
+  },
+
+  // Left stack layers
+  miniStackLeftTouchZone: {
+    position: 'absolute',
+    left: 0,
+    top: 4,
+    width: 26,
+    height: 118,
+    zIndex: 35,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  miniStackRightTouchZone: {
+    position: 'absolute',
+    right: 0,
+    top: 4,
+    width: 26,
+    height: 118,
+    zIndex: 35,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  miniStackLeft1: {
+    position: 'absolute',
+    left: 7,
+    top: 6,
+    width: 94,
+    height: 112,
+    borderRadius: 17,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 10,
+  },
+  miniStackLeft2: {
+    position: 'absolute',
+    left: 1,
+    top: 10,
+    width: 94,
+    height: 104,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    zIndex: 8,
+  },
+  miniStackLeft3: {
+    position: 'absolute',
+    left: -5,
+    top: 14,
+    width: 94,
+    height: 96,
+    borderRadius: 15,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 6,
+  },
+
+  // Right stack layers
+  miniStackRight1: {
+    position: 'absolute',
+    right: 7,
+    top: 6,
+    width: 94,
+    height: 112,
+    borderRadius: 17,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 10,
+  },
+  miniStackRight2: {
+    position: 'absolute',
+    right: 1,
+    top: 10,
+    width: 94,
+    height: 104,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    zIndex: 8,
+  },
+  miniStackRight3: {
+    position: 'absolute',
+    right: -5,
+    top: 14,
+    width: 94,
+    height: 96,
+    borderRadius: 15,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 6,
+  },
+
   deckThumbnail: {
     width: '100%',
     height: '100%',
   },
   deckBadge: {
     position: 'absolute',
-    top: 4,
-    left: 4,
+    top: -12,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
+    backgroundColor: '#161420',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    zIndex: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+    elevation: 6,
   },
   deckBadgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 10.5,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   deckAvatarBadge: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    bottom: 8,
+    left: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#22C55E',
+    backgroundColor: '#120F1D',
+    zIndex: 20,
   },
   deckAvatarImg: {
     width: '100%',
@@ -1288,13 +1589,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 84,
     left: 16,
-    right: 90,
-    zIndex: 15,
+    right: 144,
+    zIndex: 25,
   },
   creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    zIndex: 30,
   },
   creatorAvatar: {
     width: 38,
@@ -1356,7 +1658,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     zIndex: 150,
     justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 46 : 38,
+    paddingTop: Platform.OS === 'ios' ? 24 : 18,
     paddingBottom: 70,
   },
   deckBackdropDimmer: {
@@ -1507,7 +1809,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
     zIndex: 170,
-    maxWidth: 240,
+    maxWidth: 215,
   },
   deckIndicatorRow: {
     flexDirection: 'row',
