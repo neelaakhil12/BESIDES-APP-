@@ -12,6 +12,7 @@ import {
   Animated,
   PanResponder,
   Switch,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -91,6 +92,8 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
   // Selected user for map pin highlight & profile preview bottom sheet
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const selectedUserRef = useRef<any | null>(null);
+  selectedUserRef.current = selectedUser;
   const [followedUsers, setFollowedUsers] = useState<{ [id: string]: boolean }>({});
 
   // Search mode toggle
@@ -121,6 +124,10 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
         return touches >= 2 || Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3;
       },
       onPanResponderGrant: (evt) => {
+        // Dismiss selected user preview card when interacting with the map
+        if (selectedUserRef.current) {
+          setSelectedUser(null);
+        }
         const touches = evt.nativeEvent.touches;
         if (touches && touches.length >= 2) {
           const dist = Math.hypot(
@@ -166,6 +173,10 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
           x: panOffset.current.x + gestureState.dx,
           y: panOffset.current.y + gestureState.dy,
         };
+        // If it was a quick tap on the map (minimal movement) and selectedUser was open, dismiss
+        if (selectedUserRef.current && Math.hypot(gestureState.dx, gestureState.dy) < 6) {
+          setSelectedUser(null);
+        }
       },
       onPanResponderTerminate: () => {
         initialPinchDist.current = null;
@@ -564,6 +575,11 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
               {...mapPanResponder.panHandlers}
               {...(Platform.OS === 'web'
                 ? {
+                    onClick: () => {
+                      if (selectedUserRef.current) {
+                        setSelectedUser(null);
+                      }
+                    },
                     onWheel: (e: any) => {
                       if (e.ctrlKey) {
                         const zoomFactor = -e.deltaY * 0.01;
@@ -764,6 +780,19 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
               </View>
             </View>
 
+            {/* Map Dismiss Backdrop: tapping anywhere on the map outside the card closes the Profile Preview Sheet */}
+            {selectedUser && (
+              <Pressable
+                style={styles.mapDismissBackdrop}
+                onPress={() => setSelectedUser(null)}
+                {...(Platform.OS === 'web'
+                  ? {
+                      onClick: () => setSelectedUser(null),
+                    }
+                  : {})}
+              />
+            )}
+
             {/* Bottom Sheet Overlay: Profile Preview Card when selectedUser is present, else 5 People Nearby list */}
             <View
               style={styles.mapBottomSheet}
@@ -782,7 +811,13 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                   /* USER PROFILE PREVIEW CARD (Matching Video Reference)   */
                   /* ======================================================= */
                   <View style={styles.previewCardContainer}>
-                    <View style={styles.settingsDragIndicator} />
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedUser(null)}
+                      style={styles.settingsDragBarTouchable}
+                    >
+                      <View style={styles.settingsDragIndicator} />
+                    </TouchableOpacity>
 
                     {/* Top Row: Avatar, Name + Verified Badge, Distance, Close */}
                     <View style={styles.previewHeaderRow}>
@@ -1862,6 +1897,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 5,
+  },
+
+  // MAP DISMISS BACKDROP (Dismisses Profile Preview Sheet on click/tap)
+  mapDismissBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 35,
+    backgroundColor: 'transparent',
+  },
+  settingsDragBarTouchable: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 4,
+    marginBottom: 4,
   },
 
   // MAP BOTTOM SHEET
