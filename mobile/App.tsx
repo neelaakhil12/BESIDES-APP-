@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, PanResponder, Animated } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -39,8 +39,6 @@ type AppScreen =
   | 'notifications'
   | 'search';
 
-const TABS: TabName[] = ['home', 'explore', 'chat', 'me'];
-
 const MainNavigator: React.FC = () => {
   const { user, logout } = useAuth();
   // Starts on 'splash' screen so user sees the glowing Beside logo first like Instagram!
@@ -48,157 +46,6 @@ const MainNavigator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabName>('home');
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-
-  // Tab horizontal sliding track & gesture state (Instagram style sequential tab-by-tab slide)
-  const [containerWidth, setContainerWidth] = useState<number>(390);
-  const containerWidthRef = useRef<number>(390);
-  const activeTabRef = useRef<TabName>('home');
-  activeTabRef.current = activeTab;
-
-  const slideAnim = useRef(new Animated.Value(0)).current;
-
-  // Animate horizontal sliding track to target tab
-  const animateToTab = (tab: TabName, instant = false) => {
-    const idx = TABS.indexOf(tab);
-    if (idx !== -1) {
-      const targetX = -idx * containerWidthRef.current;
-      if (instant) {
-        slideAnim.setValue(targetX);
-      } else {
-        Animated.spring(slideAnim, {
-          toValue: targetX,
-          friction: 9,
-          tension: 70,
-          useNativeDriver: false,
-        }).start();
-      }
-    }
-  };
-
-  const handleSelectTab = (tab: TabName) => {
-    if (tab === 'create') {
-      setCurrentScreen('create_video');
-      return;
-    }
-    setActiveTab(tab);
-    activeTabRef.current = tab;
-    animateToTab(tab);
-    if (currentScreen !== 'main') {
-      setCurrentScreen('main');
-    }
-  };
-
-  // Sync track when returning to main screen
-  useEffect(() => {
-    if (currentScreen === 'main') {
-      animateToTab(activeTab, true);
-    }
-  }, [currentScreen]);
-
-  // PanResponder to enable smooth horizontal swiping across tabs (Instagram style)
-  const tabPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-        // 1. On 'explore' tab: map dragging and bottom sheet card dragging must not be hijacked!
-        if (activeTabRef.current === 'explore') {
-          const locX = evt.nativeEvent.locationX;
-          const locY = evt.nativeEvent.locationY;
-          const isEdge = locX < 45 || locX > (containerWidthRef.current - 45);
-          const isHeader = locY < 110;
-          if (
-            (isEdge || isHeader) &&
-            Math.abs(gestureState.dx) > 20 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-          ) {
-            return true;
-          }
-          return false;
-        }
-
-        // 2. On 'home' tab: don't hijack small card scrubber at bottom-right
-        if (activeTabRef.current === 'home') {
-          const locX = evt.nativeEvent.locationX;
-          const locY = evt.nativeEvent.locationY;
-          const isMiniCardArea = locX > (containerWidthRef.current - 120) && locY > 400;
-          if (isMiniCardArea) return false;
-
-          return (
-            Math.abs(gestureState.dx) > 25 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
-          );
-        }
-
-        // 3. On 'chat' tab: don't hijack horizontal notes carousel (between y: 90 and 190)
-        if (activeTabRef.current === 'chat') {
-          const locY = evt.nativeEvent.locationY;
-          if (locY >= 90 && locY <= 190) return false;
-          return (
-            Math.abs(gestureState.dx) > 25 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
-          );
-        }
-
-        // 4. On 'me' tab:
-        if (activeTabRef.current === 'me') {
-          return (
-            Math.abs(gestureState.dx) > 25 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
-          );
-        }
-
-        return false;
-      },
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return (
-          Math.abs(gestureState.dx) > 25 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
-        );
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const currentIdx = TABS.indexOf(activeTabRef.current);
-        const baseOffset = -currentIdx * containerWidthRef.current;
-        let dx = gestureState.dx;
-        // Rubber-band resistance on boundary edges
-        if ((currentIdx === 0 && dx > 0) || (currentIdx === TABS.length - 1 && dx < 0)) {
-          dx = dx * 0.25;
-        }
-        slideAnim.setValue(baseOffset + dx);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const currentIdx = TABS.indexOf(activeTabRef.current);
-        let nextIdx = currentIdx;
-
-        // Threshold: 40px drag or high velocity flick
-        if ((gestureState.dx < -40 || gestureState.vx < -0.5) && currentIdx < TABS.length - 1) {
-          nextIdx = currentIdx + 1;
-        } else if ((gestureState.dx > 40 || gestureState.vx > 0.5) && currentIdx > 0) {
-          nextIdx = currentIdx - 1;
-        }
-
-        const nextTab = TABS[nextIdx];
-        setActiveTab(nextTab);
-        activeTabRef.current = nextTab;
-
-        Animated.spring(slideAnim, {
-          toValue: -nextIdx * containerWidthRef.current,
-          friction: 9,
-          tension: 70,
-          useNativeDriver: false,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        const currentIdx = TABS.indexOf(activeTabRef.current);
-        Animated.spring(slideAnim, {
-          toValue: -currentIdx * containerWidthRef.current,
-          friction: 9,
-          tension: 70,
-          useNativeDriver: false,
-        }).start();
-      },
-    })
-  ).current;
 
   // 1. Splash Screen (Initial Instagram-like entry)
   if (currentScreen === 'splash') {
@@ -326,12 +173,22 @@ const MainNavigator: React.FC = () => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
               }}
-              onOpenChat={() => handleSelectTab('chat')}
+              onOpenChat={() => {
+                setActiveTab('chat');
+                setCurrentScreen('main');
+              }}
             />
           </View>
           <BottomNavBar
             currentTab={activeTab}
-            onSelectTab={handleSelectTab}
+            onSelectTab={(tab) => {
+              if (tab === 'create') {
+                setCurrentScreen('create_video');
+              } else {
+                setActiveTab(tab);
+                setCurrentScreen('main');
+              }
+            }}
             userAvatarUrl={user?.profile?.avatarUrl}
           />
         </View>
@@ -347,7 +204,10 @@ const MainNavigator: React.FC = () => {
           <View style={styles.contentArea}>
             <SearchExploreScreen
               onBack={() => setCurrentScreen('main')}
-              onSelectMoment={() => handleSelectTab('home')}
+              onSelectMoment={(moment) => {
+                setActiveTab('home');
+                setCurrentScreen('main');
+              }}
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
                 setCurrentScreen('view_profile');
@@ -356,7 +216,14 @@ const MainNavigator: React.FC = () => {
           </View>
           <BottomNavBar
             currentTab={activeTab}
-            onSelectTab={handleSelectTab}
+            onSelectTab={(tab) => {
+              if (tab === 'create') {
+                setCurrentScreen('create_video');
+              } else {
+                setActiveTab(tab);
+                setCurrentScreen('main');
+              }
+            }}
             userAvatarUrl={user?.profile?.avatarUrl}
           />
         </View>
@@ -364,62 +231,41 @@ const MainNavigator: React.FC = () => {
     );
   }
 
-  // 12. Main 4-Tab Application Container with Instagram-style horizontal slide
+  // 12. Main 5-Tab Application Container (Home, Reels, Chat, Explore, Profile)
   return (
     <MobileFrame>
       <View style={styles.appContainer}>
         {/* Tab Screen Content */}
-        <View
-          style={styles.contentArea}
-          onLayout={(e) => {
-            const width = Math.round(e.nativeEvent.layout.width);
-            if (width > 0 && Math.abs(width - containerWidthRef.current) > 1) {
-              setContainerWidth(width);
-              containerWidthRef.current = width;
-              const idx = TABS.indexOf(activeTabRef.current);
-              slideAnim.setValue(-idx * width);
-            }
-          }}
-          {...tabPanResponder.panHandlers}
-        >
-          <Animated.View
-            style={[
-              styles.tabsSliderTrack,
-              {
-                width: containerWidth * TABS.length,
-                transform: [{ translateX: slideAnim }],
-              },
-            ]}
-          >
-            {/* Tab 1: Immersive Video Feed Home Page */}
-            <View style={[styles.tabContentPane, { width: containerWidth }]}>
-              <HomeScreen
-                isActiveTab={activeTab === 'home' && currentScreen === 'main'}
-                onOpenSearch={() => setCurrentScreen('search')}
-                onOpenNotifications={() => setCurrentScreen('notifications')}
-                onOpenChat={() => handleSelectTab('chat')}
+        <View style={styles.contentArea}>
+          {/* Tab 1: Immersive Video Feed Home Page */}
+          <View style={[styles.tabContentPane, activeTab !== 'home' && styles.hiddenPane]}>
+            <HomeScreen
+              onOpenSearch={() => setCurrentScreen('search')}
+              onOpenNotifications={() => setCurrentScreen('notifications')}
+              onOpenChat={() => setActiveTab('chat')}
+              onOpenProfile={(id) => {
+                setSelectedProfileId(id);
+                setCurrentScreen('view_profile');
+              }}
+            />
+          </View>
+
+          {/* Dedicated Reels Screen (if activated) */}
+          {(activeTab as string) === 'reels' && (
+            <View style={styles.tabContentPane}>
+              <ReelsScreen
+                onOpenChat={() => setActiveTab('chat')}
                 onOpenProfile={(id) => {
                   setSelectedProfileId(id);
                   setCurrentScreen('view_profile');
                 }}
               />
             </View>
+          )}
 
-            {/* Tab 2: Explore / Nearby / Map / People */}
-            <View style={[styles.tabContentPane, { width: containerWidth }]}>
-              <ExploreScreen
-                onOpenProfile={(id) => {
-                  setSelectedProfileId(id);
-                  setCurrentScreen('view_profile');
-                }}
-                onOpenChat={() => handleSelectTab('chat')}
-                onOpenNotifications={() => setCurrentScreen('notifications')}
-                onOpenSearch={() => setCurrentScreen('search')}
-              />
-            </View>
-
-            {/* Tab 3: Instagram Direct Messages / Friend Chat */}
-            <View style={[styles.tabContentPane, { width: containerWidth }]}>
+          {/* Tab 3: Instagram Direct Messages / Friend Chat */}
+          {activeTab === 'chat' && (
+            <View style={styles.tabContentPane}>
               <ChatScreen
                 onOpenConversation={(conv) => {
                   setSelectedConversation(conv);
@@ -428,21 +274,42 @@ const MainNavigator: React.FC = () => {
                 onOpenMap={() => setCurrentScreen('maps')}
               />
             </View>
+          )}
 
-            {/* Tab 4: User Profile */}
-            <View style={[styles.tabContentPane, { width: containerWidth }]}>
+          {/* Tab 4: Explore / Nearby / Map / People */}
+          <View style={[styles.tabContentPane, activeTab !== 'explore' && styles.hiddenPane]}>
+            <ExploreScreen
+              onOpenProfile={(id) => {
+                setSelectedProfileId(id);
+                setCurrentScreen('view_profile');
+              }}
+              onOpenChat={() => setActiveTab('chat')}
+              onOpenNotifications={() => setCurrentScreen('notifications')}
+              onOpenSearch={() => setCurrentScreen('search')}
+            />
+          </View>
+
+          {/* Tab 5: User Profile */}
+          {activeTab === 'me' && (
+            <View style={styles.tabContentPane}>
               <ProfileScreen
                 userId={user?.id}
                 onOpenSettings={() => setCurrentScreen('settings')}
               />
             </View>
-          </Animated.View>
+          )}
         </View>
 
         {/* Floating Instagram-Style Rounded Pill Navigation Bar */}
         <BottomNavBar
           currentTab={activeTab}
-          onSelectTab={handleSelectTab}
+          onSelectTab={(tab) => {
+            if (tab === 'create') {
+              setCurrentScreen('create_video');
+            } else {
+              setActiveTab(tab);
+            }
+          }}
           userAvatarUrl={user?.profile?.avatarUrl}
         />
       </View>
@@ -480,24 +347,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: '100%',
     width: '100%',
-    overflow: 'hidden',
   },
   contentArea: {
     flex: 1,
     position: 'relative',
     overflow: 'hidden',
     height: '100%',
-    width: '100%',
-  },
-  tabsSliderTrack: {
-    flexDirection: 'row',
-    height: '100%',
-    position: 'relative',
   },
   tabContentPane: {
-    height: '100%',
-    position: 'relative',
-    overflow: 'hidden',
+    ...StyleSheet.absoluteFillObject,
   },
   hiddenPane: {
     display: 'none',

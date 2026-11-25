@@ -48,7 +48,6 @@ interface HomeScreenProps {
   onOpenNotifications?: () => void;
   onOpenChat?: () => void;
   onOpenProfile?: (userId: string) => void;
-  isActiveTab?: boolean;
 }
 
 // 15 Reels starting with @maya.films matching user's video exactly
@@ -100,7 +99,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenNotifications,
   onOpenChat,
   onOpenProfile,
-  isActiveTab = true,
 }) => {
   const { colors } = useTheme();
 
@@ -435,7 +433,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // 1. RENDER FULL-SCREEN VERTICAL REEL ITEM
   // =========================================================================
   const renderVideoItem = ({ item, index }: { item: any; index: number }) => {
-    const isFocused = index === currentIndex && !isDeckMode && isActiveTab;
+    const isFocused = index === currentIndex && !isDeckMode;
     const cardHeight = containerHeight > 0 ? containerHeight : 660;
 
     return (
@@ -955,7 +953,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               source={{ uri: item.videoUrl }}
               style={StyleSheet.absoluteFillObject}
               resizeMode={ResizeMode.COVER}
-              shouldPlay={isDeckMode && !isDeckPaused && isActiveTab}
+              shouldPlay={isDeckMode && !isDeckPaused}
               isLooping
               isMuted={isMuted}
               useNativeControls={false}
