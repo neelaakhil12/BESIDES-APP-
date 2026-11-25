@@ -134,26 +134,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   currentIndexRef.current = currentIndex;
   const lastScrubX = useRef(0);
 
-  // Helper to ensure small card is NEVER identical to the currently playing big reel
+  // Helper to ensure small card is NEVER identical to the active big card (in both normal & deck mode)
   const getNextDifferentMiniIndex = (currentMini: number, dir: 1 | -1) => {
     if (videos.length <= 1) return currentMini;
+    const activeBigCardIndex = isDeckMode ? deckActiveIndex : currentIndex;
     let next = (currentMini + dir + videos.length) % videos.length;
-    // If the next card matches the currently playing big reel, skip past it!
-    if (next === currentIndexRef.current) {
+    // If the next card matches the active big card, skip past it!
+    if (next === activeBigCardIndex) {
       next = (next + dir + videos.length) % videos.length;
     }
     return next;
   };
 
-  // Small preview card must ALWAYS preview a different video (the next upcoming reel in the queue, never the one playing!)
+  // Small preview card must ALWAYS preview a different video from the active big card
   useEffect(() => {
+    const activeBigCardIndex = isDeckMode ? deckActiveIndex : currentIndex;
     if (videos.length > 1) {
-      const nextIdx = (currentIndex + 1) % videos.length;
-      setMiniDeckIndex(nextIdx);
+      if (miniDeckIndex === activeBigCardIndex) {
+        setMiniDeckIndex((activeBigCardIndex + 1) % videos.length);
+      }
     }
-  }, [currentIndex, videos.length]);
+  }, [currentIndex, deckActiveIndex, isDeckMode, videos.length]);
 
   const handleOpenDeckFromMini = () => {
+    if (isDeckMode) {
+      // In deck mode, clicking small card switches the active 3D card directly to it
+      setDeckActiveIndex(miniDeckIndexRef.current);
+      deckActiveIndexRef.current = miniDeckIndexRef.current;
+      deckPanX.setValue(0);
+      return;
+    }
     setDeckSource('reel');
     setDeckActiveIndex(miniDeckIndexRef.current);
     deckActiveIndexRef.current = miniDeckIndexRef.current;
@@ -1248,6 +1258,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           </TouchableOpacity>
+
+          {/* Mini preview deck inside Deck Mode Overlay beside resume pill */}
+          {!selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
+            renderMiniPreviewDeck()
+          )}
         </View>
       )}
 
