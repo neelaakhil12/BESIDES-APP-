@@ -762,9 +762,21 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                   <SlidersHorizontal size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
+            </View>
 
-              {/* Bottom Sheet Overlay: Profile Preview Card when selectedUser is present, else 5 People Nearby list */}
-              <View style={styles.mapBottomSheet}>
+            {/* Bottom Sheet Overlay: Profile Preview Card when selectedUser is present, else 5 People Nearby list */}
+            <View
+              style={styles.mapBottomSheet}
+              onStartShouldSetResponder={() => true}
+              onTouchEnd={(e) => e.stopPropagation?.()}
+              {...(Platform.OS === 'web'
+                ? {
+                    onMouseDown: (e: any) => e.stopPropagation?.(),
+                    onTouchStart: (e: any) => e.stopPropagation?.(),
+                    onWheel: (e: any) => e.stopPropagation?.(),
+                  }
+                : {})}
+            >
                 {selectedUser ? (
                   /* ======================================================= */
                   /* USER PROFILE PREVIEW CARD (Matching Video Reference)   */
@@ -986,8 +998,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 )}
               </View>
             </View>
-          </View>
-        )}
+          )}
 
         {/* ============================================================== */}
         {/* TAB 3: PEOPLE VIEW (Clean vertical list matching screenshot)   */}
@@ -1866,6 +1877,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
+    zIndex: 40,
   },
   bottomSheetHeader: {
     flexDirection: 'row',
