@@ -126,16 +126,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Active index when browsing in 3D Card Deck mode
   const [deckActiveIndex, setDeckActiveIndex] = useState(0);
 
-  // Mini Preview Deck scrub index (0 to 14) matching video reference
-  const [miniDeckIndex, setMiniDeckIndex] = useState(0);
-  const miniDeckIndexRef = useRef(0);
+  // Mini Preview Deck scrub index (0 to 14) - starts at 1 so Reel 1 (index 0) previews Reel 2 (index 1)
+  const [miniDeckIndex, setMiniDeckIndex] = useState(1);
+  const miniDeckIndexRef = useRef(1);
   miniDeckIndexRef.current = miniDeckIndex;
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
   const lastScrubX = useRef(0);
 
-  // Sync mini deck index with current video if not manually scrubbing
+  // Helper to ensure small card is NEVER identical to the currently playing big reel
+  const getNextDifferentMiniIndex = (currentMini: number, dir: 1 | -1) => {
+    if (videos.length <= 1) return currentMini;
+    let next = (currentMini + dir + videos.length) % videos.length;
+    // If the next card matches the currently playing big reel, skip past it!
+    if (next === currentIndexRef.current) {
+      next = (next + dir + videos.length) % videos.length;
+    }
+    return next;
+  };
+
+  // Small preview card must ALWAYS preview a different video (the next upcoming reel in the queue, never the one playing!)
   useEffect(() => {
-    setMiniDeckIndex(currentIndex);
-  }, [currentIndex]);
+    if (videos.length > 1) {
+      const nextIdx = (currentIndex + 1) % videos.length;
+      setMiniDeckIndex(nextIdx);
+    }
+  }, [currentIndex, videos.length]);
 
   const handleOpenDeckFromMini = () => {
     setDeckSource('reel');
@@ -187,17 +203,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         // Step card-by-card if user continues dragging
         if (Math.abs(diff) >= 28) {
           const step = diff > 0 ? -1 : 1;
-          setMiniDeckIndex((prev) => Math.max(0, Math.min(videos.length - 1, prev + step)));
+          setMiniDeckIndex((prev) => getNextDifferentMiniIndex(prev, step as 1 | -1));
           lastScrubX.current = gestureState.dx;
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         // If a single swipe occurred without triggering continuous step
         if (lastScrubX.current === 0) {
-          if (gestureState.dx < -18 && miniDeckIndexRef.current < videos.length - 1) {
-            setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1));
-          } else if (gestureState.dx > 18 && miniDeckIndexRef.current > 0) {
-            setMiniDeckIndex((prev) => Math.max(0, prev - 1));
+          if (gestureState.dx < -18) {
+            setMiniDeckIndex((prev) => getNextDifferentMiniIndex(prev, 1));
+          } else if (gestureState.dx > 18) {
+            setMiniDeckIndex((prev) => getNextDifferentMiniIndex(prev, -1));
           }
         }
         Animated.spring(miniCardPanX, {
@@ -652,7 +668,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* LEFT SIDE CLICK TO SHUFFLE PREVIOUS CARD */}
         <TouchableOpacity
           style={styles.miniStackLeftTouchZone}
-          onPress={() => setMiniDeckIndex((prev) => Math.max(0, prev - 1))}
+          onPress={() => setMiniDeckIndex((prev) => getNextDifferentMiniIndex(prev, -1))}
           activeOpacity={0.7}
         />
 
@@ -688,7 +704,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* RIGHT SIDE CLICK TO SHUFFLE NEXT CARD */}
         <TouchableOpacity
           style={styles.miniStackRightTouchZone}
-          onPress={() => setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1))}
+          onPress={() => setMiniDeckIndex((prev) => getNextDifferentMiniIndex(prev, 1))}
           activeOpacity={0.7}
         />
 
@@ -1232,11 +1248,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           </TouchableOpacity>
-
-          {/* Mini preview deck inside Deck Mode Overlay beside resume pill */}
-          {!selectedVideoForReply && !isVideoCommentsOpen && !selectedVideoForComments && (
-            renderMiniPreviewDeck()
-          )}
         </View>
       )}
 
