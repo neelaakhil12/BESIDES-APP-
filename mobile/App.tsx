@@ -237,8 +237,8 @@ const MainNavigator: React.FC = () => {
       <View style={styles.appContainer}>
         {/* Tab Screen Content */}
         <View style={styles.contentArea}>
-          {/* Tab 1: Immersive Video Feed Home Page matching screenshot */}
-          {activeTab === 'home' && (
+          {/* Tab 1: Immersive Video Feed Home Page */}
+          <View style={[styles.tabContentPane, activeTab !== 'home' && styles.hiddenPane]}>
             <HomeScreen
               onOpenSearch={() => setCurrentScreen('search')}
               onOpenNotifications={() => setCurrentScreen('notifications')}
@@ -248,32 +248,36 @@ const MainNavigator: React.FC = () => {
                 setCurrentScreen('view_profile');
               }}
             />
-          )}
+          </View>
 
           {/* Dedicated Reels Screen (if activated) */}
           {(activeTab as string) === 'reels' && (
-            <ReelsScreen
-              onOpenChat={() => setActiveTab('chat')}
-              onOpenProfile={(id) => {
-                setSelectedProfileId(id);
-                setCurrentScreen('view_profile');
-              }}
-            />
+            <View style={styles.tabContentPane}>
+              <ReelsScreen
+                onOpenChat={() => setActiveTab('chat')}
+                onOpenProfile={(id) => {
+                  setSelectedProfileId(id);
+                  setCurrentScreen('view_profile');
+                }}
+              />
+            </View>
           )}
 
           {/* Tab 3: Instagram Direct Messages / Friend Chat */}
           {activeTab === 'chat' && (
-            <ChatScreen
-              onOpenConversation={(conv) => {
-                setSelectedConversation(conv);
-                setCurrentScreen('chat_detail');
-              }}
-              onOpenMap={() => setCurrentScreen('maps')}
-            />
+            <View style={styles.tabContentPane}>
+              <ChatScreen
+                onOpenConversation={(conv) => {
+                  setSelectedConversation(conv);
+                  setCurrentScreen('chat_detail');
+                }}
+                onOpenMap={() => setCurrentScreen('maps')}
+              />
+            </View>
           )}
 
           {/* Tab 4: Explore / Nearby / Map / People */}
-          {activeTab === 'explore' && (
+          <View style={[styles.tabContentPane, activeTab !== 'explore' && styles.hiddenPane]}>
             <ExploreScreen
               onOpenProfile={(id) => {
                 setSelectedProfileId(id);
@@ -283,14 +287,16 @@ const MainNavigator: React.FC = () => {
               onOpenNotifications={() => setCurrentScreen('notifications')}
               onOpenSearch={() => setCurrentScreen('search')}
             />
-          )}
+          </View>
 
           {/* Tab 5: User Profile */}
           {activeTab === 'me' && (
-            <ProfileScreen
-              userId={user?.id}
-              onOpenSettings={() => setCurrentScreen('settings')}
-            />
+            <View style={styles.tabContentPane}>
+              <ProfileScreen
+                userId={user?.id}
+                onOpenSettings={() => setCurrentScreen('settings')}
+              />
+            </View>
           )}
         </View>
 
@@ -347,5 +353,11 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     height: '100%',
+  },
+  tabContentPane: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  hiddenPane: {
+    display: 'none',
   },
 });

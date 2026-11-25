@@ -8,6 +8,7 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -102,47 +103,45 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: '#0B0814' }]}>
-      {/* 1. TOP HEADER (Brand Logo + "Sirla Hills", Following | For You, Search, Bell) */}
-      <View style={styles.topHeader}>
-        {/* Left: Logo + Location Label */}
-        <View style={styles.headerLeft}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logoBadge}
-          >
-            <Text style={styles.logoBadgeText}>b</Text>
-          </LinearGradient>
-          <View style={styles.locationTagWrapper}>
-            <Text style={styles.locationTitle}>Sirla Hills</Text>
-          </View>
-        </View>
+      {/* 1. TOP HEADER BAR (Identical to HomeScreen for 100% seamless tab transitions) */}
+      <View style={styles.topHeaderBar}>
+        {/* Left: Transparent Besides Logo */}
+        <TouchableOpacity style={styles.logoCircleWrapper} activeOpacity={0.8}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.headerLogoImg}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
 
-        {/* Center: Following | For You Pill */}
-        <View style={styles.headerCenterPill}>
+        {/* Center: Following | For You Switcher */}
+        <View style={styles.segmentedSwitcher}>
           <TouchableOpacity
             style={[
-              styles.headerPillItem,
-              headerFeedTab === 'following' && styles.headerPillItemActive,
+              styles.switchTab,
+              headerFeedTab === 'following' && styles.switchTabActive,
             ]}
             onPress={() => setHeaderFeedTab('following')}
             activeOpacity={0.8}
           >
-            <Text
-              style={[
-                styles.headerPillText,
-                headerFeedTab === 'following' && { color: '#FFFFFF', fontWeight: '800' },
-              ]}
-            >
-              Following
-            </Text>
+            {headerFeedTab === 'following' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activeTabGradient}
+              >
+                <Text style={styles.activeTabText}>Following</Text>
+              </LinearGradient>
+            ) : (
+              <Text style={styles.inactiveTabText}>Following</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
-              styles.headerPillItem,
-              headerFeedTab === 'for_you' && styles.headerPillItemActive,
+              styles.switchTab,
+              headerFeedTab === 'for_you' && styles.switchTabActive,
             ]}
             onPress={() => setHeaderFeedTab('for_you')}
             activeOpacity={0.8}
@@ -152,34 +151,32 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 colors={[colors.gradientStart, colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.headerPillGradient}
+                style={styles.activeTabGradient}
               >
-                <Text style={[styles.headerPillText, { color: '#FFFFFF', fontWeight: '800' }]}>
-                  For You
-                </Text>
+                <Text style={styles.activeTabText}>For You</Text>
               </LinearGradient>
             ) : (
-              <Text style={styles.headerPillText}>For You</Text>
+              <Text style={styles.inactiveTabText}>For You</Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Right: Search & Bell Icons */}
-        <View style={styles.headerRight}>
+        {/* Right: Search & Bell Buttons */}
+        <View style={styles.rightTopButtons}>
           <TouchableOpacity
-            style={styles.headerIconButton}
+            style={styles.topCircleIconBtn}
             onPress={() => (onOpenSearch ? onOpenSearch() : setShowSearchBar(!showSearchBar))}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <Search size={18} color="#FFFFFF" strokeWidth={2.2} />
+            <Search size={17} color="#FFFFFF" strokeWidth={2.4} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.headerIconButton}
+            style={[styles.topCircleIconBtn, { marginLeft: 8 }]}
             onPress={() => (onOpenNotifications ? onOpenNotifications() : onOpenChat && onOpenChat())}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <Bell size={18} color="#FFFFFF" strokeWidth={2.2} />
+            <Bell size={17} color="#FFFFFF" strokeWidth={2.2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -772,89 +769,75 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0B0814',
   },
-  // TOP HEADER
-  topHeader: {
+  // TOP HEADER BAR (Identical to HomeScreen so there is 0px shift between tabs)
+  topHeaderBar: {
+    paddingTop: Platform.OS === 'ios' ? 14 : 10,
+    paddingBottom: 8,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 8,
-    gap: 6,
+    zIndex: 100,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    marginRight: 4,
-  },
-  logoBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  logoCircleWrapper: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E0287D',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  logoBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    fontStyle: 'italic',
+  headerLogoImg: {
+    width: 28,
+    height: 28,
   },
-  locationTagWrapper: {
-    marginLeft: 6,
-    flexShrink: 1,
-  },
-  locationTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  headerCenterPill: {
+  segmentedSwitcher: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 22,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  switchTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 18,
-    padding: 2,
-    flexShrink: 0,
   },
-  headerPillItem: {
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 14,
-  },
-  headerPillItemActive: {
+  switchTabActive: {
     backgroundColor: 'transparent',
   },
-  headerPillGradient: {
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 14,
+  activeTabGradient: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 18,
   },
-  headerPillText: {
+  activeTabText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  inactiveTabText: {
     color: '#94A3B8',
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '600',
   },
-  headerRight: {
+  rightTopButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
   },
-  headerIconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  topCircleIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
 
   // SEARCH BAR

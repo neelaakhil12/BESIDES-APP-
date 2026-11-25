@@ -37,6 +37,7 @@ import { VideoCommentsModal } from './VideoCommentsModal';
 import { NewReplyModal } from './NewReplyModal';
 import { MOCK_DECK_REELS } from '../services/mockData';
 
+const { height: WINDOW_HEIGHT, width: WINDOW_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 275;
 const CARD_SPACING = 14;
 const ITEM_WIDTH = CARD_WIDTH + CARD_SPACING;
@@ -231,9 +232,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Comments modal
   const [selectedVideoForComments, setSelectedVideoForComments] = useState<any | null>(null);
 
-  // Screen container dimensions
-  const [containerHeight, setContainerHeight] = useState<number>(660);
-  const [containerWidth, setContainerWidth] = useState<number>(380);
+  // Screen container dimensions (initialized from window dimensions so there is 0 layout jump on start)
+  const [containerHeight, setContainerHeight] = useState<number>(WINDOW_HEIGHT || 720);
+  const [containerWidth, setContainerWidth] = useState<number>(WINDOW_WIDTH || 380);
 
   const flatListRef = useRef<FlatList>(null);
   const deckPanX = useRef(new Animated.Value(0)).current;
