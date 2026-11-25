@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheetContainer: {
-    height: Platform.OS === 'web' ? '78%' : '75%',
+    height: Platform.OS === 'web' ? '82%' : '80%',
     backgroundColor: '#0F0B1E',
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   gridContentContainer: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    paddingBottom: 30,
+    paddingBottom: 95,
   },
   gridRowWrapper: {
     justifyContent: 'space-between',
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   replyGridItem: {
     width: '32%',
-    height: 156,
+    height: 146,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#171228',
