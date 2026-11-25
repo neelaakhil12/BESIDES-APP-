@@ -32,6 +32,9 @@ import {
   UserCheck,
   Check,
   CheckCircle,
+  X,
+  BadgeCheck,
+  UserPlus,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { MOCK_EXPLORE_PEOPLE } from '../services/mockData';
@@ -86,8 +89,9 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
   const { radarSize, waveSize, baseRadius } = getDistanceMetrics();
 
-  // Selected user for map pin highlight
-  const [selectedUser, setSelectedUser] = useState<any | null>(MOCK_EXPLORE_PEOPLE[1] || MOCK_EXPLORE_PEOPLE[0]);
+  // Selected user for map pin highlight & profile preview bottom sheet
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [followedUsers, setFollowedUsers] = useState<{ [id: string]: boolean }>({});
 
   // Search mode toggle
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -759,104 +763,227 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Bottom Sheet Overlay: 5 People Nearby + Horizontal Cards */}
+              {/* Bottom Sheet Overlay: Profile Preview Card when selectedUser is present, else 5 People Nearby list */}
               <View style={styles.mapBottomSheet}>
-                <View style={styles.bottomSheetHeader}>
-                  <Text style={styles.peopleNearbyTitle}>
-                    {isLocationActive ? `${filteredPeople.length} people nearby` : '0 people nearby'}
-                  </Text>
-                  {isLocationActive ? (
-                    <TouchableOpacity
-                      onPress={() => setSegmentTab('people')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.seePeopleLink}>See people</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity onPress={handleEnableLocation}>
-                      <Text style={[styles.seePeopleLink, { color: colors.primary }]}>Enable</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {selectedUser ? (
+                  /* ======================================================= */
+                  /* USER PROFILE PREVIEW CARD (Matching Video Reference)   */
+                  /* ======================================================= */
+                  <View style={styles.previewCardContainer}>
+                    <View style={styles.settingsDragIndicator} />
 
-                {/* Horizontal scroll cards */}
-                {isLocationActive ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.bottomCardsScroll}
-                  >
-                    {filteredPeople.map((person) => {
-                      const isSelected = selectedUser?.id === person.id;
-                      return (
-                        <TouchableOpacity
-                          key={person.id}
-                          style={[
-                            styles.mapUserCard,
-                            isSelected && {
-                              borderColor: colors.primary,
-                              backgroundColor: 'rgba(224, 40, 125, 0.12)',
-                            },
-                          ]}
-                          onPress={() => {
-                            setSelectedUser(person);
-                            if (onOpenProfile) onOpenProfile(person.id);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          {person.isInitialAvatar ? (
-                            <View
-                              style={[
-                                styles.cardInitialCircle,
-                                { backgroundColor: '#1F1937', borderColor: colors.primary },
-                              ]}
-                            >
-                              <Text style={[styles.cardInitialText, { color: colors.primary }]}>
-                                {person.initial}
-                              </Text>
+                    {/* Top Row: Avatar, Name + Verified Badge, Distance, Close */}
+                    <View style={styles.previewHeaderRow}>
+                      <TouchableOpacity
+                        onPress={() => onOpenProfile && onOpenProfile(selectedUser.id)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={styles.previewAvatarRing}>
+                          {selectedUser.isInitialAvatar ? (
+                            <View style={styles.previewInitialCircle}>
+                              <Text style={styles.previewInitialText}>{selectedUser.initial}</Text>
                             </View>
                           ) : (
-                            <View
-                              style={[
-                                styles.cardPhotoWrapper,
-                                { borderColor: colors.primary },
-                              ]}
-                            >
-                              <Image
-                                source={{ uri: person.avatarUrl }}
-                                style={styles.cardPhoto}
-                              />
-                            </View>
+                            <Image
+                              source={{ uri: selectedUser.avatarUrl }}
+                              style={styles.previewAvatarImg}
+                            />
                           )}
-                          <View style={styles.cardInfo}>
-                            <View style={styles.nameRow}>
-                              <Text style={styles.cardNameText}>{person.fullName}</Text>
-                              <View style={styles.demoBadge}>
-                                <Text style={styles.demoBadgeText}>DEMO</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.cardDistanceText}>
-                              {person.distance} away
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                ) : (
-                  <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-                    <Text style={{ color: '#94A3B8', fontSize: 12 }}>
-                      Enable location discovery to see nearby members here.
-                    </Text>
-                  </View>
-                )}
+                        </View>
+                      </TouchableOpacity>
 
-                {/* Map attribution notice */}
-                <View style={styles.mapAttribution}>
-                  <Text style={styles.mapAttributionText}>
-                    Leaflet | Tiles © Esri — Esri, HERE, Garmin, USGS, © OpenStreetMap contributors
-                  </Text>
-                </View>
+                      <View style={styles.previewHeaderTextCol}>
+                        <TouchableOpacity
+                          onPress={() => onOpenProfile && onOpenProfile(selectedUser.id)}
+                          activeOpacity={0.85}
+                        >
+                          <View style={styles.previewNameRow}>
+                            <Text style={styles.previewNameText}>{selectedUser.fullName}</Text>
+                            <BadgeCheck size={16} color="#00F2FE" style={{ marginLeft: 5 }} />
+                          </View>
+                          <Text style={styles.previewHandleText}>
+                            @{selectedUser.username} • {selectedUser.distance} away
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Close button to return to 5 people nearby list */}
+                      <TouchableOpacity
+                        onPress={() => setSelectedUser(null)}
+                        style={styles.previewCloseBtn}
+                        activeOpacity={0.7}
+                      >
+                        <X size={18} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Stats Row: Audience | Interests | Moments */}
+                    <View style={styles.previewStatsRow}>
+                      <View style={styles.previewStatItem}>
+                        <Text style={styles.previewStatValue}>2</Text>
+                        <Text style={styles.previewStatLabel}>Audience</Text>
+                      </View>
+                      <View style={styles.previewStatDivider} />
+                      <View style={styles.previewStatItem}>
+                        <Text style={styles.previewStatValue}>2</Text>
+                        <Text style={styles.previewStatLabel}>Interests</Text>
+                      </View>
+                      <View style={styles.previewStatDivider} />
+                      <View style={styles.previewStatItem}>
+                        <Text style={styles.previewStatValue}>3</Text>
+                        <Text style={styles.previewStatLabel}>Moments</Text>
+                      </View>
+                    </View>
+
+                    {/* Location Row */}
+                    <View style={styles.previewLocationRow}>
+                      <MapPin size={13} color={colors.primary} style={{ marginRight: 6 }} />
+                      <Text style={styles.previewLocationText}>Madrid</Text>
+                    </View>
+
+                    {/* Action Buttons: Follow + Message */}
+                    <View style={styles.previewActionsRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.previewFollowBtn,
+                          followedUsers[selectedUser.id] && styles.previewFollowBtnActive,
+                        ]}
+                        onPress={() =>
+                          setFollowedUsers((prev) => ({
+                            ...prev,
+                            [selectedUser.id]: !prev[selectedUser.id],
+                          }))
+                        }
+                        activeOpacity={0.85}
+                      >
+                        <LinearGradient
+                          colors={
+                            followedUsers[selectedUser.id]
+                              ? ['#332D4D', '#251F3D']
+                              : [colors.gradientStart, colors.gradientEnd]
+                          }
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.previewFollowGradient}
+                        >
+                          <UserPlus size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.previewFollowBtnText}>
+                            {followedUsers[selectedUser.id] ? 'Following' : '+ Follow'}
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.previewMessageBtn}
+                        onPress={() => {
+                          if (onOpenChat) onOpenChat();
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <MessageCircle size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.previewMessageBtnText}>Message</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* View profile link */}
+                    <TouchableOpacity
+                      style={styles.viewProfileLinkBtn}
+                      onPress={() => onOpenProfile && onOpenProfile(selectedUser.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.viewProfileLinkText}>View profile</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.bottomSheetHeader}>
+                      <Text style={styles.peopleNearbyTitle}>
+                        {isLocationActive ? `${filteredPeople.length} people nearby` : '0 people nearby'}
+                      </Text>
+                      {isLocationActive ? (
+                        <TouchableOpacity
+                          onPress={() => setSegmentTab('people')}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.seePeopleLink}>See people</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity onPress={handleEnableLocation}>
+                          <Text style={[styles.seePeopleLink, { color: colors.primary }]}>Enable</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Horizontal scroll cards */}
+                    {isLocationActive ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.bottomCardsScroll}
+                      >
+                        {filteredPeople.map((person) => {
+                          return (
+                            <TouchableOpacity
+                              key={person.id}
+                              style={styles.mapUserCard}
+                              onPress={() => setSelectedUser(person)}
+                              activeOpacity={0.8}
+                            >
+                              {person.isInitialAvatar ? (
+                                <View
+                                  style={[
+                                    styles.cardInitialCircle,
+                                    { backgroundColor: '#1F1937', borderColor: colors.primary },
+                                  ]}
+                                >
+                                  <Text style={[styles.cardInitialText, { color: colors.primary }]}>
+                                    {person.initial}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.cardPhotoWrapper,
+                                    { borderColor: colors.primary },
+                                  ]}
+                                >
+                                  <Image
+                                    source={{ uri: person.avatarUrl }}
+                                    style={styles.cardPhoto}
+                                  />
+                                </View>
+                              )}
+                              <View style={styles.cardInfo}>
+                                <View style={styles.nameRow}>
+                                  <Text style={styles.cardNameText}>{person.fullName}</Text>
+                                  <View style={styles.demoBadge}>
+                                    <Text style={styles.demoBadgeText}>DEMO</Text>
+                                  </View>
+                                </View>
+                                <Text style={styles.cardDistanceText}>
+                                  {person.distance} away
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    ) : (
+                      <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+                        <Text style={{ color: '#94A3B8', fontSize: 12 }}>
+                          Enable location discovery to see nearby members here.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Map attribution notice */}
+                    <View style={styles.mapAttribution}>
+                      <Text style={styles.mapAttributionText}>
+                        Leaflet | Tiles © Esri — Esri, HERE, Garmin, USGS, © OpenStreetMap contributors
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -1733,10 +1860,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingTop: 10,
-    paddingBottom: 68,
-    backgroundColor: 'rgba(11, 8, 20, 0.92)',
+    paddingBottom: Platform.OS === 'ios' ? 78 : 68,
+    backgroundColor: 'rgba(11, 8, 20, 0.96)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
   },
   bottomSheetHeader: {
     flexDirection: 'row',
@@ -1820,6 +1949,165 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 8,
     textAlign: 'center',
+  },
+
+  // USER PROFILE PREVIEW CARD IN BOTTOM SHEET
+  previewCardContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 4,
+  },
+  previewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  previewAvatarRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#E0287D',
+    overflow: 'hidden',
+    backgroundColor: '#1E1836',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewAvatarImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  previewInitialCircle: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E1836',
+  },
+  previewInitialText: {
+    color: '#00F2FE',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  previewHeaderTextCol: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  previewNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewNameText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  previewHandleText: {
+    color: '#94A3B8',
+    fontSize: 12.5,
+    marginTop: 2,
+  },
+  previewCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  previewStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  previewStatValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  previewStatLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  previewStatDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  previewLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  previewLocationText: {
+    color: '#CBD5E1',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  previewActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  previewFollowBtn: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  previewFollowBtnActive: {
+    opacity: 0.85,
+  },
+  previewFollowGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  previewFollowBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  previewMessageBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  previewMessageBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  viewProfileLinkBtn: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  viewProfileLinkText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 
   // TAB 3: PEOPLE VIEW
