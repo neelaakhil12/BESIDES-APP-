@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -53,25 +55,146 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
   // Top header toggle: 'following' | 'for_you'
   const [headerFeedTab, setHeaderFeedTab] = useState<'following' | 'for_you'>('for_you');
 
-  // Main 3-segment switcher: 'nearby' | 'map' | 'people'
-  const [segmentTab, setSegmentTab] = useState<'nearby' | 'map' | 'people'>('nearby');
+  // Main 3-segment switcher: 'nearby' | 'map' | 'people' (Map active by default)
+  const [segmentTab, setSegmentTab] = useState<'nearby' | 'map' | 'people'>('map');
 
-  // Location discovery permission state
-  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
+  // Location discovery permission state (enabled so map radar & people are interactive immediately)
+  const [isLocationEnabled, setIsLocationEnabled] = useState(true);
 
   // Filter distance (e.g. 100m, 300m, 500m, 1km)
   const [distanceFilter, setDistanceFilter] = useState('Within 100 m');
   const [isDiscoverable, setIsDiscoverable] = useState(true);
 
   // Selected user for map pin highlight
-  const [selectedUser, setSelectedUser] = useState<any | null>(MOCK_EXPLORE_PEOPLE[0]);
+  const [selectedUser, setSelectedUser] = useState<any | null>(MOCK_EXPLORE_PEOPLE[1] || MOCK_EXPLORE_PEOPLE[0]);
 
   // Search mode toggle
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Map zoom level simulation
-  const [mapZoom, setMapZoom] = useState(1);
+  // Interactive Map State & Pan/Zoom Animations
+  const [mapZoom, setMapZoom] = useState(1.0);
+  const currentZoomRef = useRef(1.0);
+  currentZoomRef.current = mapZoom;
+
+  const initialPinchDist = useRef<number | null>(null);
+  const initialPinchZoom = useRef<number>(1.0);
+
+  const zoomAnim = useRef(new Animated.Value(1.0)).current;
+  const panAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panOffset = useRef({ x: 0, y: 0 });
+
+  // Map PanResponder for smooth dragging/panning and 2-finger hand pinch-to-zoom
+  const mapPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt) => {
+        // Immediate grab for multi-touch (pinch)
+        return (evt.nativeEvent.touches?.length || 0) >= 2;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        const touches = evt.nativeEvent.touches?.length || 0;
+        return touches >= 2 || Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3;
+      },
+      onPanResponderGrant: (evt) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches && touches.length >= 2) {
+          const dist = Math.hypot(
+            touches[0].pageX - touches[1].pageX,
+            touches[0].pageY - touches[1].pageY
+          );
+          initialPinchDist.current = dist;
+          initialPinchZoom.current = currentZoomRef.current;
+        } else {
+          panAnim.setOffset({
+            x: panOffset.current.x,
+            y: panOffset.current.y,
+          });
+          panAnim.setValue({ x: 0, y: 0 });
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches && touches.length >= 2) {
+          // Hand pinch zoom gesture (2 fingers)
+          const dist = Math.hypot(
+            touches[0].pageX - touches[1].pageX,
+            touches[0].pageY - touches[1].pageY
+          );
+          if (initialPinchDist.current === null) {
+            initialPinchDist.current = dist;
+            initialPinchZoom.current = currentZoomRef.current;
+          } else if (initialPinchDist.current > 0) {
+            const scaleFactor = dist / initialPinchDist.current;
+            const newZoom = Math.min(Math.max(initialPinchZoom.current * scaleFactor, 0.5), 3.0);
+            zoomAnim.setValue(newZoom);
+            setMapZoom(newZoom);
+          }
+        } else if (!touches || touches.length === 1) {
+          initialPinchDist.current = null;
+          panAnim.setValue({ x: gestureState.dx, y: gestureState.dy });
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        initialPinchDist.current = null;
+        panAnim.flattenOffset();
+        panOffset.current = {
+          x: panOffset.current.x + gestureState.dx,
+          y: panOffset.current.y + gestureState.dy,
+        };
+      },
+      onPanResponderTerminate: () => {
+        initialPinchDist.current = null;
+      },
+    })
+  ).current;
+
+  // Zoom In (+)
+  const handleZoomIn = () => {
+    setMapZoom((prev) => {
+      const nextZoom = Math.min(prev + 0.3, 2.5);
+      Animated.spring(zoomAnim, {
+        toValue: nextZoom,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: false,
+      }).start();
+      return nextZoom;
+    });
+  };
+
+  // Zoom Out (-)
+  const handleZoomOut = () => {
+    setMapZoom((prev) => {
+      const nextZoom = Math.max(prev - 0.3, 0.55);
+      Animated.spring(zoomAnim, {
+        toValue: nextZoom,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: false,
+      }).start();
+      return nextZoom;
+    });
+  };
+
+  // Recenter (⌖)
+  const handleRecenter = () => {
+    panOffset.current = { x: 0, y: 0 };
+    setMapZoom(1.0);
+    Animated.parallel([
+      Animated.spring(panAnim, {
+        toValue: { x: 0, y: 0 },
+        friction: 6,
+        tension: 50,
+        useNativeDriver: false,
+      }),
+      Animated.spring(zoomAnim, {
+        toValue: 1.0,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
 
   // Cycle distance filter
   const cycleDistance = () => {
@@ -411,76 +534,123 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
         {segmentTab === 'map' && (
           <View style={styles.mapViewWrapper}>
             {/* Styled Dark Cartography Surface with simulated street vectors */}
-            <View style={styles.mapCanvas}>
-              {/* Dark Map Street Grid Pattern Overlay */}
-              <View style={styles.mapGridStreets}>
-                {/* Diagonal roads */}
-                <View style={[styles.mapRoadLine, { top: '20%', left: 0, right: 0, transform: [{ rotate: '18deg' }] }]} />
-                <View style={[styles.mapRoadLine, { top: '45%', left: 0, right: 0, transform: [{ rotate: '-12deg' }] }]} />
-                <View style={[styles.mapRoadLine, { top: '70%', left: 0, right: 0, transform: [{ rotate: '8deg' }] }]} />
-                <View style={[styles.mapRoadLine, { left: '30%', top: 0, bottom: 0, transform: [{ rotate: '15deg' }] }]} />
-                <View style={[styles.mapRoadLine, { left: '65%', top: 0, bottom: 0, transform: [{ rotate: '-25deg' }] }]} />
+            <View
+              style={styles.mapCanvas}
+              {...mapPanResponder.panHandlers}
+              {...(Platform.OS === 'web'
+                ? {
+                    onWheel: (e: any) => {
+                      if (e.ctrlKey) {
+                        const zoomFactor = -e.deltaY * 0.01;
+                        setMapZoom((prev) => {
+                          const nextZoom = Math.min(Math.max(prev + zoomFactor, 0.5), 3.0);
+                          zoomAnim.setValue(nextZoom);
+                          return nextZoom;
+                        });
+                      } else {
+                        if (e.deltaY < 0) {
+                          handleZoomIn();
+                        } else {
+                          handleZoomOut();
+                        }
+                      }
+                    },
+                  }
+                : {})}
+            >
+              {/* Scalable & Pannable Cartography Surface */}
+              <Animated.View
+                style={[
+                  styles.animatedMapSurface,
+                  {
+                    transform: [
+                      { translateX: panAnim.x },
+                      { translateY: panAnim.y },
+                      { scale: zoomAnim },
+                    ],
+                  },
+                ]}
+              >
+                {/* Dark Map Street Grid Pattern Overlay */}
+                <View style={styles.mapGridStreets}>
+                  <View style={[styles.mapRoadLine, { top: '20%', left: -200, right: -200, transform: [{ rotate: '18deg' }] }]} />
+                  <View style={[styles.mapRoadLine, { top: '45%', left: -200, right: -200, transform: [{ rotate: '-12deg' }] }]} />
+                  <View style={[styles.mapRoadLine, { top: '70%', left: -200, right: -200, transform: [{ rotate: '8deg' }] }]} />
+                  <View style={[styles.mapRoadLine, { left: '30%', top: -200, bottom: -200, transform: [{ rotate: '15deg' }] }]} />
+                  <View style={[styles.mapRoadLine, { left: '65%', top: -200, bottom: -200, transform: [{ rotate: '-25deg' }] }]} />
 
-                {/* Suburbs & River Contours */}
-                <View style={styles.mapWaterBody} />
-                <View style={styles.mapParkArea} />
-              </View>
+                  {/* Suburbs & River Contours */}
+                  <View style={styles.mapWaterBody} />
+                  <View style={styles.mapParkArea} />
+                </View>
 
-              {/* Clustered User Pins (Only rendered when Location Discovery is active!) */}
-              {isLocationActive ? (
-                <View style={styles.pinsClusterContainer}>
-                  {filteredPeople.map((person, idx) => {
-                    const isSelected = selectedUser?.id === person.id;
-                    const clusterOffsets = [
-                      { left: 100, top: 120, zIndex: 10 },
-                      { left: 145, top: 140, zIndex: 12 },
-                      { left: 170, top: 90, zIndex: 8 },
-                      { left: 185, top: 130, zIndex: 9 },
-                      { left: 155, top: 110, zIndex: 11 },
-                    ];
-                    const pos = clusterOffsets[idx % clusterOffsets.length];
+                {/* Central Glowing Radar Circle & User Indicator */}
+                <View style={styles.centralRadarContainer} pointerEvents="box-none">
+                  <View style={styles.radarOuterWave} />
+                  <View style={styles.centralRadarBoundary}>
+                    <View style={styles.userCenterDot}>
+                      <View style={styles.userCenterInnerDot} />
+                    </View>
+                  </View>
+                </View>
 
-                    return (
-                      <TouchableOpacity
-                        key={person.id}
-                        style={[
-                          styles.mapPinItem,
-                          {
-                            left: pos.left,
-                            top: pos.top,
-                            zIndex: isSelected ? 20 : pos.zIndex,
-                          },
-                        ]}
-                        onPress={() => setSelectedUser(person)}
-                        activeOpacity={0.85}
-                      >
-                        <View
+                {/* Clustered User Pins (Only rendered when Location Discovery is active!) */}
+                {isLocationActive && (
+                  <View style={styles.pinsClusterContainer} pointerEvents="box-none">
+                    {filteredPeople.map((person, idx) => {
+                      const isSelected = selectedUser?.id === person.id;
+                      const angles = [-65, -15, 50, 130, 210];
+                      const radii = [110, 130, 105, 125, 100];
+                      const angle = (angles[idx % angles.length] * Math.PI) / 180;
+                      const radius = radii[idx % radii.length];
+                      const offsetX = Math.cos(angle) * radius;
+                      const offsetY = Math.sin(angle) * radius;
+
+                      return (
+                        <TouchableOpacity
+                          key={person.id}
                           style={[
-                            styles.pinAvatarRing,
+                            styles.mapPinItem,
                             {
-                              borderColor: isSelected ? colors.primary : '#E0287D',
-                              shadowColor: colors.primary,
+                              transform: [{ translateX: offsetX }, { translateY: offsetY }],
+                              zIndex: isSelected ? 30 : 10 + idx,
                             },
                           ]}
+                          onPress={() => setSelectedUser(person)}
+                          activeOpacity={0.85}
                         >
-                          {person.isInitialAvatar ? (
-                            <View style={styles.pinInitialCircle}>
-                              <Text style={styles.pinInitialLetter}>{person.initial}</Text>
+                          <View
+                            style={[
+                              styles.pinAvatarRing,
+                              isSelected && styles.pinAvatarRingActive,
+                            ]}
+                          >
+                            {person.isInitialAvatar ? (
+                              <View style={styles.pinInitialCircle}>
+                                <Text style={styles.pinInitialLetter}>{person.initial}</Text>
+                              </View>
+                            ) : (
+                              <Image source={{ uri: person.avatarUrl }} style={styles.pinPhoto} />
+                            )}
+                          </View>
+                          {isSelected ? (
+                            <View style={styles.pinSelectedHandlePill}>
+                              <Text style={styles.pinSelectedHandleText}>@{person.username}</Text>
                             </View>
                           ) : (
-                            <Image source={{ uri: person.avatarUrl }} style={styles.pinPhoto} />
+                            <View style={styles.pinDemoBadge}>
+                              <Text style={styles.pinDemoText}>DEMO</Text>
+                            </View>
                           )}
-                        </View>
-                        {/* DEMO Tag under pin */}
-                        <View style={styles.pinDemoBadge}>
-                          <Text style={styles.pinDemoText}>DEMO</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                /* Privacy Mode: When Location Discovery is OFF, no user is visible and you are not visible */
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </Animated.View>
+
+              {/* Privacy Mode: When Location Discovery is OFF */}
+              {!isLocationActive && (
                 <View style={styles.mapPrivacyOverlay}>
                   <View style={styles.mapPrivacyCard}>
                     <MapPin size={26} color={colors.primary} style={{ marginBottom: 8 }} />
@@ -507,11 +677,21 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
                 </View>
               )}
 
+              {/* Distance Pill Badge on Top Left */}
+              <TouchableOpacity
+                style={styles.mapDistanceBadge}
+                onPress={cycleDistance}
+                activeOpacity={0.8}
+              >
+                <SlidersHorizontal size={12} color="#84CC16" />
+                <Text style={styles.mapDistanceBadgeText}>{distanceFilter}</Text>
+              </TouchableOpacity>
+
               {/* Floating Map Controls on Right Edge */}
               <View style={styles.mapControlsColumn}>
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={() => setMapZoom((prev) => Math.min(prev + 0.2, 2))}
+                  onPress={handleZoomIn}
                   activeOpacity={0.7}
                 >
                   <Plus size={18} color="#FFFFFF" />
@@ -519,7 +699,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={() => setMapZoom((prev) => Math.max(prev - 0.2, 0.6))}
+                  onPress={handleZoomOut}
                   activeOpacity={0.7}
                 >
                   <Minus size={18} color="#FFFFFF" />
@@ -527,7 +707,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={() => setSelectedUser(filteredPeople[0])}
+                  onPress={handleRecenter}
                   activeOpacity={0.7}
                 >
                   <Crosshair size={18} color="#FFFFFF" />
@@ -535,7 +715,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={() => cycleDistance()}
+                  onPress={handleRecenter}
                   activeOpacity={0.7}
                 >
                   <Navigation size={18} color="#FFFFFF" />
@@ -543,7 +723,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 
                 <TouchableOpacity
                   style={styles.mapControlButton}
-                  onPress={() => cycleDistance()}
+                  onPress={cycleDistance}
                   activeOpacity={0.7}
                 >
                   <SlidersHorizontal size={18} color="#FFFFFF" />
@@ -1072,6 +1252,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F0C1B',
     position: 'relative',
+    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : {}),
+  },
+  animatedMapSurface: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+    ...(Platform.OS === 'web' ? ({ cursor: 'grab' } as any) : {}),
   },
   mapGridStreets: {
     ...StyleSheet.absoluteFillObject,
@@ -1101,6 +1290,75 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     backgroundColor: 'rgba(138, 43, 226, 0.03)',
+  },
+
+  // CENTRAL RADAR & USER PINPOINT
+  centralRadarContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarOuterWave: {
+    position: 'absolute',
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    borderWidth: 1,
+    borderColor: 'rgba(132, 204, 22, 0.22)',
+    borderStyle: 'dashed',
+  },
+  centralRadarBoundary: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 2,
+    borderColor: '#84CC16',
+    backgroundColor: 'rgba(132, 204, 22, 0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#84CC16',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  userCenterDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(132, 204, 22, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userCenterInnerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#84CC16',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+
+  // DISTANCE BADGE
+  mapDistanceBadge: {
+    position: 'absolute',
+    top: 18,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(22, 17, 41, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(132, 204, 22, 0.4)',
+    gap: 6,
+    zIndex: 25,
+  },
+  mapDistanceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // PRIVACY OVERLAY (When Location Discovery is OFF)
@@ -1161,11 +1419,14 @@ const styles = StyleSheet.create({
 
   // MAP PINS CLUSTER
   pinsClusterContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mapPinItem: {
     position: 'absolute',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   pinAvatarRing: {
     width: 44,
@@ -1180,6 +1441,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.65,
     shadowRadius: 8,
     elevation: 6,
+  },
+  pinAvatarRingActive: {
+    borderColor: '#84CC16',
+    borderWidth: 3,
+    shadowColor: '#84CC16',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    elevation: 10,
+    transform: [{ scale: 1.15 }],
+  },
+  pinSelectedHandlePill: {
+    position: 'absolute',
+    bottom: -22,
+    backgroundColor: 'rgba(15, 11, 30, 0.95)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#84CC16',
+    shadowColor: '#84CC16',
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  pinSelectedHandleText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   pinInitialCircle: {
     width: '100%',
