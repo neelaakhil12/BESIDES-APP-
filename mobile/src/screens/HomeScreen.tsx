@@ -167,31 +167,52 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const miniCardPanX = useRef(new Animated.Value(0)).current;
+
+  // PanResponder to enable smooth swipe / slide gestures on the small card
+  // onStartShouldSetPanResponder is false so clicking sides/center still works instantly!
+  // onMoveShouldSetPanResponder activates when dragging horizontally > 6px.
   const miniPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 4,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dx) > 6 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
       onPanResponderGrant: () => {
         lastScrubX.current = 0;
       },
       onPanResponderMove: (_, gestureState) => {
-        const delta = gestureState.dx - lastScrubX.current;
-        if (Math.abs(delta) > 10) {
-          const step = delta > 0 ? 1 : -1;
+        miniCardPanX.setValue(gestureState.dx * 0.65);
+        const diff = gestureState.dx - lastScrubX.current;
+        // Step card-by-card if user continues dragging
+        if (Math.abs(diff) >= 28) {
+          const step = diff > 0 ? -1 : 1;
           setMiniDeckIndex((prev) => Math.max(0, Math.min(videos.length - 1, prev + step)));
           lastScrubX.current = gestureState.dx;
         }
       },
-      onPanResponderRelease: (e, gestureState) => {
-        // If it was a simple click/tap without dragging:
-        if (Math.abs(gestureState.dx) < 6 && Math.abs(gestureState.dy) < 6) {
-          const clientX =
-            (e.nativeEvent as any)?.clientX ||
-            (e.nativeEvent as any)?.pageX ||
-            0;
-          const target = (e.currentTarget as any);
-          handleMiniDeckClick(clientX, target);
+      onPanResponderRelease: (_, gestureState) => {
+        // If a single swipe occurred without triggering continuous step
+        if (lastScrubX.current === 0) {
+          if (gestureState.dx < -18 && miniDeckIndexRef.current < videos.length - 1) {
+            setMiniDeckIndex((prev) => Math.min(videos.length - 1, prev + 1));
+          } else if (gestureState.dx > 18 && miniDeckIndexRef.current > 0) {
+            setMiniDeckIndex((prev) => Math.max(0, prev - 1));
+          }
         }
+        Animated.spring(miniCardPanX, {
+          toValue: 0,
+          friction: 7,
+          tension: 60,
+          useNativeDriver: false,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(miniCardPanX, {
+          toValue: 0,
+          friction: 7,
+          tension: 60,
+          useNativeDriver: false,
+        }).start();
       },
     })
   ).current;
@@ -591,10 +612,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // =========================================================================
   // 1.5 RENDER MINI PREVIEW DECK (Reusable helper for reel items & deck mode)
+  // Supports both:
+  // 1) Click/Tap: Side wings shuffle, center card/badge opens 3D Pop-Up Reels Card
+  // 2) Swipe/Slide: Dragging horizontally slides through cards one-by-one!
   // =========================================================================
   const renderMiniPreviewDeck = (reelIndex?: number) => {
     return (
-      <View style={styles.floatingMiniPreviewDeck}>
+      <View style={styles.floatingMiniPreviewDeck} {...miniPanResponder.panHandlers}>
         {/* Stacked Cards behind to the LEFT (cards with index < miniDeckIndex) */}
         {miniDeckIndex > 2 && (
           <View style={styles.miniStackLeft3} pointerEvents="none">
@@ -667,44 +691,62 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           activeOpacity={0.7}
         />
 
-        {/* ACTIVE SMALL CARD (Clicking opens the Pop-Up Reels Card!) */}
-        <TouchableOpacity
-          style={styles.miniCardMain}
-          onPress={handleOpenDeckFromMini}
-          activeOpacity={0.88}
+        {/* ACTIVE SMALL CARD (Clicking opens Pop-Up Card, Swiping slides cards one-by-one!) */}
+        <Animated.View
+          style={[
+            styles.miniCardMain,
+            {
+              transform: [{ translateX: miniCardPanX }],
+            },
+          ]}
         >
-          <Image
-            source={{ uri: videos[miniDeckIndex]?.thumbnailUrl }}
-            style={styles.deckThumbnail}
-          />
-
-          {/* Subtle bottom vignette gradient for avatar contrast */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.55)']}
+          <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-
-          {/* Mini Creator Avatar Badge with Green Ring at Bottom-Left */}
-          <View style={styles.deckAvatarBadge} pointerEvents="none">
+            onPress={handleOpenDeckFromMini}
+            activeOpacity={0.88}
+          >
             <Image
-              source={{ uri: videos[miniDeckIndex]?.user?.avatarUrl }}
-              style={styles.deckAvatarImg}
+              source={{ uri: videos[miniDeckIndex]?.thumbnailUrl }}
+              style={styles.deckThumbnail}
             />
-          </View>
-        </TouchableOpacity>
+
+            {/* Subtle bottom vignette gradient for avatar contrast */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.55)']}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+
+            {/* Mini Creator Avatar Badge with Green Ring at Bottom-Left */}
+            <View style={styles.deckAvatarBadge} pointerEvents="none">
+              <Image
+                source={{ uri: videos[miniDeckIndex]?.user?.avatarUrl }}
+                style={styles.deckAvatarImg}
+              />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Top Floating Badge: 📹 index/15 (Clicking opens the Pop-Up Reels Card!) */}
-        <TouchableOpacity
-          style={styles.deckBadge}
-          onPress={handleOpenDeckFromMini}
-          activeOpacity={0.8}
+        <Animated.View
+          style={[
+            styles.deckBadge,
+            {
+              transform: [{ translateX: miniCardPanX }],
+            },
+          ]}
         >
-          <VideoIcon size={12} color="#22C55E" fill="#22C55E" style={{ marginRight: 3.5 }} />
-          <Text style={styles.deckBadgeText}>
-            {`${miniDeckIndex + 1}/15`}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+            onPress={handleOpenDeckFromMini}
+            activeOpacity={0.8}
+          >
+            <VideoIcon size={12} color="#22C55E" fill="#22C55E" style={{ marginRight: 3.5 }} />
+            <Text style={styles.deckBadgeText}>
+              {`${miniDeckIndex + 1}/15`}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     );
   };
